@@ -4,11 +4,12 @@ from database.database import get_session
 from models.pings import blackList_table
 from schemas.black_list import BlackListCreate
 from typing import List
+from utils.auth import get_current_user
 black_router=APIRouter(tags=["Black List"],prefix="/blacklist")
 
 # blacklist a number
 @black_router.post("",description="Provide a number to black list",status_code=status.HTTP_201_CREATED,response_model=blackList_table)
-async def black_list_number(black_list:BlackListCreate,session:Session=Depends(get_session)):
+async def black_list_number(black_list:BlackListCreate,session:Session=Depends(get_session),user=Depends(get_current_user)):
     #search the database for the number first to prevent blacklisting number twice you fool
     black_listed_number=select(blackList_table).where(blackList_table.cell_number == black_list.cell_number)
     #execute the query
@@ -30,7 +31,7 @@ async def black_list_number(black_list:BlackListCreate,session:Session=Depends(g
 
 # get the full black list
 @black_router.get("",description="Get all the blacklisted cell number",response_model=List[blackList_table])
-async def get_black_listed_number(session:Session=Depends(get_session)):
+async def get_black_listed_number(session:Session=Depends(get_session),user=Depends(get_current_user)):
     #paginate the query
     query=select(blackList_table).where(blackList_table.dmasa_status==True)
     statement=session.exec(query).all()

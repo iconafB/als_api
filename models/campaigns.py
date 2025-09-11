@@ -9,7 +9,6 @@ class Campaigns(SQLModel,table=True):
     branch:str=Field(default=None,nullable=False,index=True)
     camp_code:str=Field(default=None,nullable=False)
     campaign_name:str=Field(default=None,nullable=False)
-    is_a_deduped:bool=Field(default=None,nullable=False)
     created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
     
 #leads that have been deduped under a specific campaign

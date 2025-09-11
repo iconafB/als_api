@@ -12,18 +12,19 @@ from database.database import get_session
 from utils.load_als_service import get_loader_als_loader_service
 from utils.dnc_util import dnc_list_of_numbers
 from utils.list_names import get_list_names
+from utils.auth import get_current_user
 
 campaigns_router=APIRouter(tags=["Campaigns"],prefix="/campaigns")
 
 @campaigns_router.post("/create-campaign",status_code=status.HTTP_201_CREATED,description="Create a new campaign by providing a branch, campaign code and campaign name",response_model=Campaigns)
-async def create_campaign(campaign:CreateCampaign,session:Session=Depends(get_session)):
+async def create_campaign(campaign:CreateCampaign,session:Session=Depends(get_session),user=Depends(get_current_user)):
     
     try:
         #search the database for a campaign,hopefully the db is indexed
         statement=select(Campaigns).where(Campaigns.camp_code == campaign.camp_code)
         campaign_query=session.exec(statement).first()
         if not campaign_query==None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=f"campaign:{campaign.campaign_name} with campaign code:{campaign.campaign_code} already exists")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=f"campaign:{campaign.campaign_name} with campaign code:{campaign.camp_code} already exists")
         payload=campaign.model_dump()
         new_campaign=Campaigns.model_validate(payload)
         session.add(new_campaign)
@@ -40,7 +41,7 @@ async def create_campaign(campaign:CreateCampaign,session:Session=Depends(get_se
 
 #load campaign to a specific branch
 #load numbers from the global dnc or king price dnc 
-async def load_campaign(camp_code:str=Path(...,description="Please provide the campaign code"),rule_code:str=Query(description="Please provide the rule code for the campaign to load"),dnc_type:str=Query(description="Global DNC or King Price Optional"),branch:str=Query(description="Branch for the campaign"),session:Session=Depends(get_session)):
+async def load_campaign(camp_code:str=Path(...,description="Please provide the campaign code"),rule_code:str=Query(description="Please provide the rule code for the campaign to load"),dnc_type:str=Query(description="Global DNC or King Price Optional"),branch:str=Query(description="Branch for the campaign"),session:Session=Depends(get_session),user=Depends(get_current_user)):
     #calculate the number of entries in table campaign_rules
     statement=select(func.count()).select_from(campaign_rules).where(campaign_rules.camp_code==camp_code and campaign_rules.rule_code==rule_code)
     
@@ -130,11 +131,9 @@ async def load_campaign(camp_code:str=Path(...,description="Please provide the c
     return {"message":f"load campaign:{camp_code}"}
 
 
-
-
 @campaigns_router.patch("/{camp_code}",status_code=status.HTTP_200_OK)
 
-async def assign_campaign_rule_to_campaign(camp_code:str=Path(description="provide the campaign code that needs a rule assigned to it"),rule_code:str=Query(description="Provide the rule code for this campaign"),session:Session=Depends(get_session)):
+async def assign_campaign_rule_to_campaign(camp_code:str=Path(description="provide the campaign code that needs a rule assigned to it"),rule_code:str=Query(description="Provide the rule code for this campaign"),session:Session=Depends(get_session),user=Depends(get_current_user)):
    
     try:
         #find the campaign using the campaign code

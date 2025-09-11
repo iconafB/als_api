@@ -5,12 +5,13 @@ from io import BytesIO
 import os
 from models.campaigns import Campaign_Dedupes
 from database.database import get_session
+from utils.auth import get_current_user
 
 dedupe_routes=APIRouter(tags=["Dedupes"],prefix="/dedupes")
 
 @dedupe_routes.post("/add-dedupes-manually")
 
-async def add_dedupes_manually(campaign_name:str=Query(description="Please provide the campaign name"),file:UploadFile=File(...,description="Please provide a file for a manual dedupe"),session:Session=Depends(get_session)):
+async def add_dedupes_manually(campaign_name:str=Query(description="Please provide the campaign name"),file:UploadFile=File(...,description="Please provide a file for a manual dedupe"),session:Session=Depends(get_session),user=Depends(get_current_user)):
     
     #we are going to use these rows
     all_rows=[]
@@ -73,7 +74,8 @@ async def add_dedupes_manually(campaign_name:str=Query(description="Please provi
 
 # this should an automated script that polls the dmasa api and post it to vc dial
 @dedupe_routes.post("/submit-dedupe-return")
-async def submit_dedupe_return():
+
+async def submit_dedupe_return(user=Depends(get_current_user)):
 
     return {"message":"submit dedupe return"}
 

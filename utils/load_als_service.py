@@ -66,10 +66,12 @@ class Load_ALS_Class():
     def load_leads_to_als_request(leads:List,insert:List[dict],camp_code:str,session:Session=Depends(get_session)):
         
         try:
+            #insert the records into the leads history table
             new_records=[leads_history_table(**data) for data in leads]
+            #add all the documents into
             session.add_all(new_records)
             session.commit()
-            return True
+            
         except Exception as e:
             print("print the exception")
             print(e)

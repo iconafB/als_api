@@ -5,11 +5,12 @@ from database.database import get_session
 from sqlalchemy import select
 from schemas.leads import LeadsCount
 from sqlmodel import Session
+from utils.auth import get_current_user
 
 leads_router=APIRouter(tags=["Leads Route"],prefix="/leads")
 
 @leads_router.get("/get-count",status_code=status.HTTP_200_OK,response_model=LeadsCount)
-async def get_number_of_leads(campaign_name:str=Query(description="Please enter the campaign name"),status:str=Query(description="Enter the campaign status"),session:Session=Depends(get_session)):
+async def get_number_of_leads(campaign_name:str=Query(description="Please enter the campaign name"),status:str=Query(description="Enter the campaign status"),session:Session=Depends(get_session),user=Depends(get_current_user)):
     #build the EXISTS subquery
     exists_query=select(1).where(Campaign_Dedupes.cell_number==information_table.cell_number).exists()
     #construct the final query

@@ -4,12 +4,12 @@ from models.campaign_rules import campaign_rules
 from schemas.sql_rule import Sql_Rules,Change_Active_Rule
 from database.database import get_session
 from utils.logger import define_logger
-
+from utils.auth import get_current_user
 campaign_rule_router=APIRouter(tags=["Campaign Rules"],prefix="/campaign-rules")
 
 #Take Care of the response model
 @campaign_rule_router.post("",status_code=status.HTTP_201_CREATED,description="Create SQL Rule for filtering leads by providing the rule",response_model=campaign_rules)
-async def create_campaign_rule(rule:Sql_Rules,session:Session=Depends(get_session)):
+async def create_campaign_rule(rule:Sql_Rules,session:Session=Depends(get_session),user=Depends(get_current_user)):
     
     try:
         #find the rule query
@@ -37,7 +37,7 @@ async def create_campaign_rule(rule:Sql_Rules,session:Session=Depends(get_sessio
 
 #assign campaign rule to a campaign
 @campaign_rule_router.post("/assign-rule/{rule_code}",description="assign a campaign rule to a campaign")
-async def assign_active_rule_to_campaign(camp_code:str):
+async def assign_active_rule_to_campaign(camp_code:str,user=Depends(get_current_user)):
     #fetch the campaign using the camp_code
     #fetch the rule using the rule code
 
@@ -45,7 +45,7 @@ async def assign_active_rule_to_campaign(camp_code:str):
 
 #change an active rule
 @campaign_rule_router.patch("/change-active-rule/{rule_code}",description="Provide a rule code to change an active rule")
-async def update_active_rule(rule_code:str,incoming_rule:Change_Active_Rule,session:Session=Depends(get_session)):
+async def update_active_rule(rule_code:str,incoming_rule:Change_Active_Rule,session:Session=Depends(get_session),user=Depends(get_current_user)):
     #find the rule using a rule code using the below query
     print("Print the incoming data")
     print(incoming_rule)
@@ -113,7 +113,7 @@ async def update_active_rule(rule_code:str,incoming_rule:Change_Active_Rule,sess
 
 #activate an existing campaign
 @campaign_rule_router.put("/activate-rule/{rule_code}",description="Activate the rule to use it on other leads")
-async def activate_rule(rule_code:str,session:Session=Depends(get_session)):
+async def activate_rule(rule_code:str,session:Session=Depends(get_session),user=Depends(get_current_user)):
     #find the campaign to activate
     query=select(campaign_rules).where(campaign_rules.rule_code==rule_code)
     #execute the query
@@ -129,9 +129,3 @@ async def activate_rule(rule_code:str,session:Session=Depends(get_session)):
 
     return {"message":f"sql rule:{rule_code} is not active"}
 
-
-
-#confirm the number of leads
-@campaign_rule_router.get("/count-leads")
-async def get_number_of_leads():
-    return {"message":"calculate the number of leads"}
