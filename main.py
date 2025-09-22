@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-
 from routers.authentication import auth_router
 from routers.campaigns import campaigns_router
 from routers.dnc_routes import dnc_router
@@ -23,7 +22,7 @@ app=FastAPI(title="ALS BACKEND API",
 #Not best practice you need to filter the correct domain
 
 
-origins=["*"]
+origins=["http://localhost:5173","http://127.0.0.1:8000/auth/login","http://127.0.0.1:8000/auth/register"]
 
 app.add_middleware(CORSMiddleware,allow_origins=origins,allow_credentials=True,allow_methods=["*"],allow_headers=["*"])
 
