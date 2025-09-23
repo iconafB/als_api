@@ -15,6 +15,7 @@ def get_list_names(camp_code:str,session:Session=Depends(get_session)):
         leads_query_count=select(func.count(distinct(leads_history_table.list_name))).where(leads_history_table.camp_code==camp_code and leads_history_table.created_at==current_date)
         #execute the query
         execute_the_leads_count_query=session.exec(leads_query_count)
+        
         index=0
         if execute_the_leads_count_query==0:
             index=1
@@ -25,6 +26,7 @@ def get_list_names(camp_code:str,session:Session=Depends(get_session)):
         #formulate the list name string
         list_name = camp_code + '_' + current_date[2:] + '_' + str(index) + 'CS'
         #return the list name
+
         return list_name
     
     except Exception as e:

@@ -1,7 +1,8 @@
-from fastapi import APIRouter,status,Depends,HTTPException,Path,Query,BackgroundTasks
+from fastapi import APIRouter,status,Depends,HTTPException,Path,Query,BackgroundTasks,Request,Response
 from sqlmodel import Session,select,or_,and_
 import sqlalchemy as sa
 import requests
+from datetime import datetime
 import json
 from sqlalchemy import func
 from models.campaigns import Campaigns
@@ -13,35 +14,47 @@ from utils.load_als_service import get_loader_als_loader_service
 from utils.dnc_util import dnc_list_of_numbers
 from utils.list_names import get_list_names
 from utils.auth import get_current_user
+from utils.logger import define_logger
+
+
+campaigns_logger=define_logger("als campaign logs","logs/campaigns_route.log")
 
 campaigns_router=APIRouter(tags=["Campaigns"],prefix="/campaigns")
 
 @campaigns_router.post("/create-campaign",status_code=status.HTTP_201_CREATED,description="Create a new campaign by providing a branch, campaign code and campaign name",response_model=Campaigns)
+
 async def create_campaign(campaign:CreateCampaign,session:Session=Depends(get_session),user=Depends(get_current_user)):
     
     try:
         #search the database for a campaign,hopefully the db is indexed
         statement=select(Campaigns).where(Campaigns.camp_code == campaign.camp_code)
         campaign_query=session.exec(statement).first()
+
         if not campaign_query==None:
+            campaigns_logger.info(f"campaign with campaign code:{campaign.camp_code} already exists")
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=f"campaign:{campaign.campaign_name} with campaign code:{campaign.camp_code} already exists")
+        
         payload=campaign.model_dump()
         new_campaign=Campaigns.model_validate(payload)
         session.add(new_campaign)
         session.commit()
         session.refresh(new_campaign)
+        campaigns_logger.info(f"campaign:{campaign.campaign_name} with campaign code:{campaign.camp_code} created successfully")
+       
         return new_campaign
     
     except Exception as e:
-        print("print the exception object")
         print(e)
+        campaigns_logger.error(f"error occurred:{e} while creating campaign:{campaign.campaign_name} with campaign code:{campaign.camp_code}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail="An internal server error occurred")
+
 #load a campaign given the campaign code: camp_code
 @campaigns_router.post("/load-campaign/{camp_code}",description="load a campaign to vicdial if it exist. Create one and assign a rule to it",status_code=status.HTTP_200_OK,response_model=Campaigns)
 
 #load campaign to a specific branch
 #load numbers from the global dnc or king price dnc 
 async def load_campaign(camp_code:str=Path(...,description="Please provide the campaign code"),rule_code:str=Query(description="Please provide the rule code for the campaign to load"),dnc_type:str=Query(description="Global DNC or King Price Optional"),branch:str=Query(description="Branch for the campaign"),session:Session=Depends(get_session),user=Depends(get_current_user)):
+    
     #calculate the number of entries in table campaign_rules
     statement=select(func.count()).select_from(campaign_rules).where(campaign_rules.camp_code==camp_code and campaign_rules.rule_code==rule_code)
     
@@ -50,19 +63,23 @@ async def load_campaign(camp_code:str=Path(...,description="Please provide the c
     try:
         #check if the campaign exist before trying to load it
         load_campaign=select(Campaigns).where(Campaigns.camp_code==camp_code)
+
         #find the campaign to be loaded
         campaign=session.exec(load_campaign).first()
         #if the campaign does not exist notify the use
         if campaign==None:
+            campaigns_logger.exception(f"campaign:{camp_code} does not exist")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"campaign:{camp_code} does not exist")
         #find the campaign rule for the this campaign
         campaign_rule_query=select(campaign_rules).where(campaign_rules.camp_code==campaign.camp_code)
+
         print("print the campaign rule query")
         print(campaign_rule_query)
         print("print what the query returns")
         rule_query=session.exec(campaign_rule_query).first()
         print(rule_query)
         if rule_query == None:
+            campaigns_logger.exception(f"no campaign rule:{rule_query} exist for campaign:{camp_code}")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"no campaign rule exist for this campaign with campaign code:{camp_code}")
         #SELECT id, fore_name, last_name, cell FROM info_tbl WHERE (salary>=16000 or salary is null) and (typedata = "Status") and (last_used is null or (DATE_PART("day",now()::timestamp - last_used::timestamp) > 29)) and (CAST(SUBSTRING(id,1,2) AS INTEGER) <=98 and CAST(SUBSTRING(id,1,2) AS INTEGER) >=68) order by random() limit 3000
         
@@ -113,6 +130,7 @@ async def load_campaign(camp_code:str=Path(...,description="Please provide the c
             #submit dma records
             #
             #credits_response=requests.get(url=base_url,params=params_values,verify=False,timeout=10)
+            
             dma_response=requests.post("http://127.0.0.1:8000/dma/upload-data",data=json.dumps(data_line),verify=False,timeout=30)
             
             #check the status of the response

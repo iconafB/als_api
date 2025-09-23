@@ -8,11 +8,11 @@ from schemas.auth import LoginUser,RegisterUser,RegisterUserResponse,ForgotPassw
 from utils.auth import verify_password,hash_password,create_access_token,get_current_active_user
 from settings.Settings import get_settings
 from database.database import get_session
+from utils.logger import define_logger
 
+auth_logger=define_logger("als auth logger","logs/auth_route.log")
 auth_router=APIRouter(tags=["Authentication"],prefix="/auth")
-
 # register response model after database integration
-
 @auth_router.post("/register",status_code=status.HTTP_201_CREATED,response_model=RegisterUserResponse,description="Register user to the als by providing email,password, and full name")
 
 async def register_user(user:RegisterUser,session:Session=Depends(get_session)):
@@ -20,6 +20,7 @@ async def register_user(user:RegisterUser,session:Session=Depends(get_session)):
     user_exists=session.exec(select(users_table).where(users_table.email==user.email)).first()
     #return an error if the user does not exist already
     if not user_exists==None:
+        auth_logger.info(f"username:{user.email} already exist")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=f"user with email:{user.email} already exists")
     #hash the password before storing it
     user.password=hash_password(user.password)
@@ -27,8 +28,9 @@ async def register_user(user:RegisterUser,session:Session=Depends(get_session)):
     new_user=users_table(email=user.email,password=user.password,first_name=user.first_name,last_name=user.last_name,is_active=True)
     
     if not new_user:
+        
+        auth_logger.error(f"Error occurred while registering user with email:{user.email}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"a server error occurred while creating user:{user.full_name}")
-    
     #add the new user to the session object
     session.add(new_user)
     #commit the new user to the database
@@ -36,6 +38,7 @@ async def register_user(user:RegisterUser,session:Session=Depends(get_session)):
     #refresh to get the auto-generated id and default values
     session.refresh(new_user)
     #return the registered user
+    auth_logger.info(f"user:{new_user.email} successfully registered")
     return new_user
 
 @auth_router.post("/login",status_code=status.HTTP_200_OK,response_model=Token,description="Login to the als by providing a password and email")
@@ -43,20 +46,21 @@ async def register_user(user:RegisterUser,session:Session=Depends(get_session)):
 async def login_user(user:Annotated[OAuth2PasswordRequestForm,Depends()],session:Session=Depends(get_session)):
     #index on email
     #find the user using the email 
-    
     login_user=session.exec(select(users_table).where(users_table.email==user.username)).first()
     #return an error if the user is not found
-    
     if not login_user.email == user.username:
+        auth_logger.info(f"user with email:{user.username} does not exist")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,detail="Invalid Credentials")
     #verify the password and return an error if the password is wrong
     if not verify_password(user.password,login_user.password):
+        auth_logger.info(f"user password:{user.password} does not exist")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,detail="Invalid Credentials")
     #set the token expiration time
     access_token_expires=timedelta(minutes=get_settings().ACCESS_TOKEN_EXPIRES_MINUTES)
     #generate the access token
     token=create_access_token(data={'user_id':login_user.id},expires_delta=access_token_expires)
     #return the token
+    auth_logger.info(f"username:{user.username} successfully logged in")
     return Token(access_token=token,token_type='Bearer')
 
 #reset password
