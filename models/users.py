@@ -13,3 +13,5 @@ class users_table(SQLModel,table=True):
     last_name:str=Field(default=None,nullable=False)
     is_active:bool=Field(default=None,nullable=False)
     created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
+
+

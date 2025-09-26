@@ -11,10 +11,10 @@ from database.database import get_session
 from utils.logger import define_logger
 
 auth_logger=define_logger("als auth logger","logs/auth_route.log")
+
 auth_router=APIRouter(tags=["Authentication"],prefix="/auth")
 # register response model after database integration
 @auth_router.post("/register",status_code=status.HTTP_201_CREATED,response_model=RegisterUserResponse,description="Register user to the als by providing email,password, and full name")
-
 async def register_user(user:RegisterUser,session:Session=Depends(get_session)):
     #verify if the user exist
     user_exists=session.exec(select(users_table).where(users_table.email==user.email)).first()
@@ -28,9 +28,9 @@ async def register_user(user:RegisterUser,session:Session=Depends(get_session)):
     new_user=users_table(email=user.email,password=user.password,first_name=user.first_name,last_name=user.last_name,is_active=True)
     
     if not new_user:
-        
         auth_logger.error(f"Error occurred while registering user with email:{user.email}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"a server error occurred while creating user:{user.full_name}")
+    
     #add the new user to the session object
     session.add(new_user)
     #commit the new user to the database
