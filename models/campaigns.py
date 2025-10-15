@@ -5,7 +5,7 @@ from sqlalchemy.types import JSON
 from datetime import datetime
 
 
-class Campaigns(SQLModel,table=True):
+class campaign_tbl(SQLModel,table=True):
     id:Optional[int]=Field(nullable=False,default=None,primary_key=True)
     #index on the campaign branch
     branch:str=Field(default=None,nullable=False,index=True)

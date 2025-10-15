@@ -1,9 +1,13 @@
-from fastapi import Depends,HTTPException
+from fastapi import Depends,HTTPException,status
 from sqlalchemy import distinct,func
 from database.database import get_session
 from models.leads import leads_history_table
 from sqlmodel import Session,select
 from datetime import datetime
+from utils.logger import define_logger
+
+load_list_names_logger=define_logger("fetch list names","logs/load_list_names")
+
 
 def get_list_names(camp_code:str,session:Session=Depends(get_session)):
 
@@ -31,9 +35,6 @@ def get_list_names(camp_code:str,session:Session=Depends(get_session)):
     
     except Exception as e:
         print("The exception object for getting the list name")
-        print(e)
-        return None
+        load_list_names_logger.critical(f"{str(e)}")
+        return HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="Error Occurred while fetching list names")
     
-
-
-

@@ -4,10 +4,10 @@ from typing import Optional
 from datetime import datetime
 
 
-class information_table(SQLModel,table=True):
-    id:Optional[int]=Field(primary_key=True,nullable=False,default=None)
-    cell_number:str|None=Field(nullable=False,default=None)
-    id_number:str|None=Field(nullable=False,default=None)
+class info_tbl(SQLModel,table=True):
+
+    cell:Optional[str]=Field(primary_key=True,nullable=False,default=None)
+    id:str=Field(nullable=False,default=None)
     title:str|None=Field(nullable=False,default=None)
     fore_name:str|None=Field(nullable=False,default=None)
     last_name:str | None=Field(nullable=False,default=None)
@@ -19,6 +19,7 @@ class information_table(SQLModel,table=True):
     status:str | None=Field(nullable=False,default=None)
     derived_income:float=Field(nullable=False,default=None)
     type_data:str | None=Field(nullable=False,default=None)
+    last_used:Optional[datetime]=Field(nullable=False,default=None)
     extra_info:str | None=Field(nullable=False,default=None)
     created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
 

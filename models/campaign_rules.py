@@ -1,5 +1,5 @@
-from sqlmodel import SQLModel,Field
-from typing import Optional
+from sqlmodel import SQLModel,Field,or_,and_,cast
+from typing import Optional,Dict,Any
 from datetime import datetime
 from sqlalchemy import func
 
@@ -20,3 +20,13 @@ class campaign_rules(SQLModel,table=True):
     province:str=Field(nullable=False,default=None)
     is_active:bool=Field(nullable=False,default=True)
     created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
+
+
+class campaign_rules(SQLModel,table=True):
+    
+    rule_code:Optional[int]=Field(primary_key=True,default=None)
+    rule_name:str=Field(nullable=False,default=None)
+    rule_values:Dict[str,Any]=Field(nullable=True,default=None)
+    created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
+
+

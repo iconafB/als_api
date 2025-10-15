@@ -1,10 +1,49 @@
-from fastapi import APIRouter,Depends
+from fastapi import APIRouter,Depends,HTTPException,BackgroundTasks,UploadFile,File,Query,status
+import pandas as pd
+import re
 from utils.auth import get_current_user
+from utils.logger import define_logger
+from schemas.dnc_schemas import DNCNumberResponse
+from utils.dnc_util import send_dnc_list_to_db
+
+dnc_logger=define_logger("als dnc logs","logs/dnc_route.log")
+
+
 dnc_router=APIRouter(tags=["DNC Enpoints"],prefix="/dnc")
 
-@dnc_router.post("/add-blacklist",description="Add a list of numbers to blacklist locally")
+@dnc_router.post("/add-blacklist",description="Add a list of numbers to blacklist locally",response_model=DNCNumberResponse)
 
-async def add_to_blacklist(user=Depends(get_current_user)):
+async def add_to_blacklist(bg_tasks:BackgroundTasks,camp_code:str=Query(...,description="Add the campaign code"),file:UploadFile=File(...,description="Add File With numbers to blacklist"),user=Depends(get_current_user)):
     
-    return {"message":"a text file of numbers is added to the blacklist"}
+    try:
+        contents=await file.read()
+
+        list_contents=pd.DataFrame(contents.splitlines()).values().tolist()
+
+        list_to_dnc=[]
+
+        for list_content in list_contents:
+            new=str(list_content[0],'UTF-8')
+
+            if re.match('^\d{10}$',new):
+                list_to_dnc.append(new)
+        
+        if len(list_to_dnc)>0:
+            status=True
+            result=str(len(list_to_dnc)) + 'records added to the dnc'
+            bg_tasks.add_task(send_dnc_list_to_db,list_to_dnc,camp_code)
+            #add this to the dnc using a background task
+        
+        else:
+            status=False
+            result=str(len(list_to_dnc)) + 'records added to the dnc'
+
+        dnc_logger.info(f"{len(list_to_dnc)} numbers added to the dnc list")
+        return DNCNumberResponse(status=status,message=result)
+    
+    except Exception as e:
+        dnc_logger.error(f"{str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"error reading file")
+
+
 

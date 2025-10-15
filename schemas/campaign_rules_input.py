@@ -1,0 +1,13 @@
+from sqlmodel import SQLModel,Field
+from pydantic import BaseModel
+from typing import Optional
+
+class CampaignRuleInput(SQLModel):
+    #non-json defined values
+    rule_name:str
+    #json data
+    salary:int
+    min_age:int
+    max_age:int
+    
+

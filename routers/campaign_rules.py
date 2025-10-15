@@ -7,6 +7,9 @@ from utils.logger import define_logger
 from utils.auth import get_current_user
 campaign_rule_router=APIRouter(tags=["Campaign Rules"],prefix="/campaign-rules")
 
+
+campaign_rules_logger=define_logger("als campaign rules","logs/campaign_rules_logs")
+
 #Take Care of the response model
 @campaign_rule_router.post("",status_code=status.HTTP_201_CREATED,description="Create SQL Rule for filtering leads by providing the rule",response_model=campaign_rules)
 async def create_campaign_rule(rule:Sql_Rules,session:Session=Depends(get_session),user=Depends(get_current_user)):
@@ -27,7 +30,11 @@ async def create_campaign_rule(rule:Sql_Rules,session:Session=Depends(get_sessio
         session.add(data_obj)
         session.commit()
         session.refresh(data_obj)
+
+        
+
         return data_obj
+    
     except Exception as e:
         print("print the exception object")
         print(e)
