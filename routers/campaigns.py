@@ -200,7 +200,8 @@ async def load_campaign(load_campaign:LoadCampaignSchemas,camp_code:str=Path(...
             session.add(dma_validation_table_rows)
             session.commit()
             session.close()
-
+            #I am gonna need the list name from here
+            
         return LoadCampaignResponse(campaign_code=camp_code,branch=load_campaign.branch,list_name=list_name,audit_id=submit_dma_data.json()['DedupeAuditId'],records_processed=submit_dma_data.json()['RecordsProcessed'],dma_status_code=submit_dma_data.status_code,load_dmasa_status=load_dmasa_status,number_of_leads_submitted=leads_length)
 
             

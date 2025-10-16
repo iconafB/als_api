@@ -7,6 +7,7 @@ from sqlalchemy import func
 #Indexes the tables fool
 
 class finance_table(SQLModel,table=True):
+    
     cell_number:str=Field(primary_key=True,nullable=False,default=None)
     cipro_reg:bool=Field(nullable=False,default=None)
     deed_office_reg:bool=Field(nullable=False,default=None)

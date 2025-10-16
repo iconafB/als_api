@@ -178,9 +178,9 @@ class DMA_Class():
 
                 status_response=self.check_status_and_return_records(audit_id,number_of_records)
 
-                #check the status returned from db
+                #check the status returned from 
+                
                 if isinstance(status_response,list):
-
                     #You now have the numbers to processed with zeros append,no update the audit id table
                     #fetch the audit id to update
                     update_audit_stmt=select(dma_audit_id_table).where(dma_audit_id_table.audit_id==audit_id)
@@ -188,7 +188,6 @@ class DMA_Class():
                     update_session_result=session.exec(update_audit_stmt).first()
                     
                     if update_session_result==None:
-
                         dma_logger.error('Audit ID not found')
                         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail="Audit ID does not exist")
                     #update the status to True signifying that the audit id table entry has been
@@ -222,67 +221,85 @@ class DMA_Class():
 
 
     def check_status_and_return_records(self,audit_id,number_of_records,session:Session=Depends(get_session)):
-
+        #check dedupe status
         status_response=self.check_dedupe_status(audit_id,number_of_records)
-
+        #
         if status_response.json()['Status']=='Download Ready' and status_response.status_code==200 and len(status_response.json()['Errors'])==0:
             
-            #update the audit id table to processed
-            audit_id_table_query=select(dma_audit_id_table.is_processed).where(dma_audit_id_table.audit_id==audit_id)
-            
+            #Fetch the audit id table ,using the given audit id to update the is processed flag to true meaning records for that audit id have been processed
+
+            audit_id_table_query=select(dma_audit_id_table).where(dma_audit_id_table.audit_id==audit_id)
+            #fetch 
             execute_audit_id_table=session.exec(audit_id_table_query).first()
-            #check if this query exists 
-            execute_audit_id_table=True
+            #check if it exist and log appropriately. needs attention 
+            if execute_audit_id_table==None:
+                dma_logger.info(f"Audit ID:{audit_id} does not exist,no processing can be performed")
+                # raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"Audit ID:{audit_id} does not exist,no processing can be peformed")
+                return
+            
+            #update the is_processed flag from dma_audit_table table
+            execute_audit_id_table.is_processed=True
+            #add it to the session object and commit the changes
             session.add(execute_audit_id_table)
             session.commit()
-
-            #read the dma output
+            #read the dma output for the dedupe 
+            
             records_response=self.read_dedupe_output(audit_id)
 
             if len(records_response.json()['Errors'])!=0:
                 print("return the errors returned from dmasa")
                 dma_logger.info(records_response.json()['Errors'])
-
+                #record errors occurred on the dma
+                for error_record in len(records_response.json()['Errors']):
+                    dma_logger.error(f"{error_record}")
                 return
             
             #take the list of actual records from the dmasa api endpoint
-
             dedupe_records=records_response.json()['ReadOutput']
+            # #append zeros on the cell numbers
+            # cellphone_numbers_map={entry['DataEntry'] for entry in dedupe_records}
+            # cellphone_numbers_map[1]['DataEntry']="0"+cellphone_numbers_map[1]['DataEntry']
+            
+            #append zero on all the numbers from dmasa,slow find another approach
 
-            deduped_list_numbers=[]
-            #append zero on all the numbers from dmasa
             for record in dedupe_records:
                 print("records retrieved from dmasa")
                 #append zeros on the numbers returned from dmasa
-                record['DataEntry']='0'+ record['DataEntry']
-                #cell numbers only, needs to be removed
-                deduped_list_numbers.append(record['DataEntry'])
-            #return the records 
+                record['DataEntry'] = '0'+ record['DataEntry']
 
-            #make a database call to fetch information that was previously stored with the same audit id
-            submitted_records_query=select(dma_validation_data.id,dma_validation_data.fore_name,dma_validation_data.last_name,dma_validation_data.cell,dma_validation_data.is_processed).where(dma_validation_data.audit_id==audit_id,dma_validation_data.is_processed==False)
+                #cell numbers only, needs to be 
+
+            #unnecessary database call/query
+            
+            #make a database call to fetch information that was previously stored with the same audit id and is not processed
+            submitted_records_query=select(dma_validation_data).where((dma_validation_data.audit_id==audit_id) and (dma_validation_data.is_processed==False))
             
             #execute the query to fetch the list of tuples from the db
             submitted_records=session.exec(submitted_records_query).all()
             #do the comparison here than submit to dedago and update the status
+            
             # deduped_list_numbers['DataEntry']=
 
             if submitted_records==None:
                 dma_logger.error(f'error fetching data from table dma_validation_data with audit id:{audit_id}')
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"error fetching data from after deduping")
             
+            #update and commit the is_processed flag to true on dma_validation_data table
+            session.exec(update(dma_validation_data).where((dma_validation_data.is_processed==False) & (dma_validation_data.audit_id==audit_id)).values(is_processed=True))
+            #I can propagate these changes from the audit_id_table, and use a direct sql query for faster updates
+            session.commit()
 
-            #filter optedouts which can be done by updating the db stored values, the opted out are 
+            #filter optedouts which can be done by updating the db stored values, the opted out are
+            # run this for larger loads 
             if len(dedupe_records)>10000:
-
+                #build a new list 
                 opted_out_true=[e for e in dedupe_records if e.get("OptedOut") is True]
 
                 #return if there are not opted out
-                if not opted_out_true:
 
+                if not opted_out_true:
                     print("No opted outs")
                     dma_logger.info(f"No records to process for audit id:{audit_id}")
-
                     return
                 
                 session.exec(text(""" CREATE TEMP TABLE temp_opted_out_table(id TEXT,opted_out BOOLEAN) ON COMMIT DROP;"""))
@@ -305,17 +322,20 @@ class DMA_Class():
                 print(f"updated length:{len(opted_out_true)} records where opted out is TRUE")
 
                 return
-            
+            #run this for smaller loads
+
             if len(dedupe_records)<10000:
                 #use cell numbers to filter not id
 
                 small_opted_out_list=[record["id"] for record in dedupe_records if record.get("OptedOut") is True]
                 
                 if not small_opted_out_list:
+
                     print("No records to updates")
                     dma_logger.info("No records to updates no opted outs")
                     return 
                 #needs attention 
+
                 dedupe_stmt=(update(dma_validation_data).where(dma_validation_data.id.in_(small_opted_out_list)).where(dma_validation_data.opted_out==False).values(opted_out=True))
                 small_dedupe_result=session.exec(dedupe_stmt)
                 session.commit()

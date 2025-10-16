@@ -20,8 +20,10 @@ load_als_logger=define_logger("als load als request","logs/load_als_request")
 class Load_ALS_Class():
     
     def get_token(self,branch:str):
+
         if branch=='INVTNTDBN':
             return get_settings().INVTNTDBN_TOKEN
+        
         elif branch=='P3':
             return get_settings().P3_TOKEN
         elif branch=='HQ':
@@ -29,6 +31,7 @@ class Load_ALS_Class():
         else:
             return get_settings().YORK_TOKEN
     
+
     #you need to properly set this up
     def set_payload(self,branch:str,leads:UploadFile,camp_code:str,list_name:str):
         #set the list id inside this method
@@ -50,10 +53,13 @@ class Load_ALS_Class():
 
         elif branch=='HQ':
             payload['custom_list_id']=[100,108]
+        
         else:
             payload['custom_list_id']=[100,112]
         
         return payload
+
+    #Send data to dedago to get a list id
 
     def send_data_to_dedago(self,token:str,payload:dict):
         
@@ -83,32 +89,53 @@ class Load_ALS_Class():
         #we will get the list id only and the status code
         return dedago_response 
     
+
+    #this method will scan if the audit id table has been processed or not 
+
     #this method with scan the audit_id_table
     # 
     def scan_table_and_call_send_to_dedago(self,session:Session=Depends(get_session)):
-        #fetch the audit ids dma_audit_id_table
-        #fetch processed audit id
-        processed_audit_query=select(dma_audit_id_table).where(dma_audit_id_table.is_processed==True)
-
-        processed_audit_ids=session.exec(processed_audit_query).all()
+        #scan the audit id table
+        audit_id_data_query=select(dma_audit_id_table).where(dma_audit_id_table.is_processed==False and dma_audit_id_table.is_sent_to_dedago==False)
         
-        if processed_audit_ids==None:
-            print("all audit ids have been processed")
+        fetched_data=session.exec(audit_id_data_query).all()
+
+        if len(fetched_data)==0:
+            #all audit ids have been processed
+            load_als_logger.info('All audit ids have been procesed')
             return
         
-        for record in processed_audit_ids:
-            
-            print("print record")
-            
-        records_query=select(dma_validation_data).where(dma_validation_data.is_processed==True)
-        
-        records=session.exec(records_query).all()
+        #you now have audit ids that are not processed
+        #for each audit id fetch the all documents that are unprocessed 
+        for record in fetched_data:
+            print(record.audit_id)
+            #
+            dma_records_query=select(dma_validation_data.id,dma_validation_data.fore_name,dma_validation_data.last_name,dma_validation_data.cell,dma_validation_data.branch,dma_validation_data.camp_code).where(dma_validation_data.audit_id==record.audit_id and dma_validation_data.is_processed==True)
+            #execute the query, now I have all the records I need to send to dedago than update dma_audit_id_table is_sent_to_dedago flag
+
+            dma_records=session.exec(dma_records_query).all()
+            #get the branch to load the correct token and campaign code to send to dedago
+
+            branch=dma_records[0][4] if dma_records else None
+            camp_code=dma_records[0][5] if dma_records else None
+
+            #remove the branch and campaign code columns
+            trimmed_records=[record[:4] for record in dma_records]
+            #prepare a list to send to 
+            dedago_keys=["vendor_lead_code","first_name","last_name","cell"]
+            #dedago list
+
+            dedago_list=[dict(zip(dedago_keys,value)) for value in trimmed_records]
+            #get a token using a branch name 
+            token=self.get_token(branch)
+
+            dedago_response=self.send_data_to_dedago(token,dedago_list)
+
+            if dedago_response.status_code!=200:
+                load_als_logger.error("")
 
         return True 
-    
-    def get_token_branch(records:List):
-
-        return 
+ 
     
     def load_leads_to_als_request(leads:List,insert:List[dict],camp_code:str,session:Session=Depends(get_session)):
         

@@ -5,7 +5,6 @@ from datetime import datetime
 
 
 class info_tbl(SQLModel,table=True):
-
     cell:Optional[str]=Field(primary_key=True,nullable=False,default=None)
     id:str=Field(nullable=False,default=None)
     title:str|None=Field(nullable=False,default=None)
@@ -45,6 +44,7 @@ class leads_history_table(SQLModel,table=True):
 
 
 class car_table(SQLModel,table=True):
+    
     id:Optional[int]=Field(primary_key=True,default=None,nullable=False)
     #foreign key
     cell_number:str=Field(default=None,nullable=False)
