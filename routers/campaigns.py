@@ -194,7 +194,7 @@ async def load_campaign(load_campaign:LoadCampaignSchemas,camp_code:str=Path(...
                 raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=submit_dma_data.json()['Errors'])
             
             #add the original data to dma validation to validate with the dma submitted information
-            dma_validation_table_rows=[dma_validation_data(id=r[0],fore_name=r[1],last_name=r[2],cell=r[3],audit_id=audit_id,is_processed=False,branch=load_campaign.branch,camp_code=camp_code,opted_out=False) for r in filtered_results]
+            dma_validation_table_rows=[dma_validation_data(id=r[0],fore_name=r[1],last_name=r[2],cell=r[3],audit_id=audit_id,is_processed=False,branch=load_campaign.branch,camp_code=camp_code,list_name=list_name,opted_out=False) for r in filtered_results]
             #add the results filtered against the dnc into the dma validation table
             #all records here are not processed
             session.add(dma_validation_table_rows)

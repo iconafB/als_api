@@ -33,7 +33,8 @@ class Load_ALS_Class():
     
 
     #you need to properly set this up
-    def set_payload(self,branch:str,leads:UploadFile,camp_code:str,list_name:str):
+    def set_payload(self,branch:str,leads:List,camp_code:str,list_name:str):
+
         #set the list id inside this method
         status_list= ["BLACKL", "DEC", "INV", "LB", "NDNE", "NEW", "NI", "PTH", "QTR", "SALE", "SENT"]
         payload={}
@@ -56,27 +57,13 @@ class Load_ALS_Class():
         
         else:
             payload['custom_list_id']=[100,112]
-        
+        #this is what you will dump on the send to dedago
         return payload
 
     #Send data to dedago to get a list id
 
     def send_data_to_dedago(self,token:str,payload:dict):
         
-        #from the audit id table fetch the all the audit ids
-
-        #lookup the dma_validation table for opted out to send to dedago
-        #opted_out_records=select(dma_validation_data).where()
-        #the data contains campaign code and branch code, extract the branch and load the token from the .env file
-
-        #the token will be loaded from the env file based on branch
-
-        #send record to dedago when they are ready
-
-        #build the list to send to dedago
-
-        #dedago_list=[]
-
         dedago_headers={
                 "Content-Type":"application/json",
                 "Accept":"application/json"
@@ -110,14 +97,17 @@ class Load_ALS_Class():
         for record in fetched_data:
             print(record.audit_id)
             #
-            dma_records_query=select(dma_validation_data.id,dma_validation_data.fore_name,dma_validation_data.last_name,dma_validation_data.cell,dma_validation_data.branch,dma_validation_data.camp_code).where(dma_validation_data.audit_id==record.audit_id and dma_validation_data.is_processed==True)
+            dma_records_query=select(dma_validation_data.id,dma_validation_data.fore_name,dma_validation_data.last_name,dma_validation_data.cell,dma_validation_data.branch,dma_validation_data.camp_code,dma_validation_data.list_name).where(dma_validation_data.audit_id==record.audit_id and dma_validation_data.is_processed==True)
             #execute the query, now I have all the records I need to send to dedago than update dma_audit_id_table is_sent_to_dedago flag
 
             dma_records=session.exec(dma_records_query).all()
             #get the branch to load the correct token and campaign code to send to dedago
 
             branch=dma_records[0][4] if dma_records else None
+            #campaign code
             camp_code=dma_records[0][5] if dma_records else None
+            #get list name
+            list_name=dma_records[0][6] if dma_records else None
 
             #remove the branch and campaign code columns
             trimmed_records=[record[:4] for record in dma_records]
@@ -127,14 +117,28 @@ class Load_ALS_Class():
 
             dedago_list=[dict(zip(dedago_keys,value)) for value in trimmed_records]
             #get a token using a branch name 
+            #call the set_payload method
+            payload_response=self.set_payload(branch,dedago_list,camp_code,list_name)
             token=self.get_token(branch)
 
-            dedago_response=self.send_data_to_dedago(token,dedago_list)
+            dedago_response=self.send_data_to_dedago(token,payload_response)
 
-            if dedago_response.status_code!=200:
-                load_als_logger.error("")
+            #list_id=dedago_response.json['list_id']
+            #these will build up 
 
-        return True 
+            if dedago_response['status_code']!=200:
+                load_als_logger.error("Error occurred while fetching list id from dedago")
+                return
+            
+            if dedago_response['status_code']==200 and dedago_response['list_id']!=None:
+                dedago_list_id=dedago_response['list_id']
+                #insert the list id on the dma_validation table
+
+            #pass the list to the load_leads_to_als_request, now you need a rule name for that
+
+
+            
+        return  
  
     
     def load_leads_to_als_request(leads:List,insert:List[dict],camp_code:str,session:Session=Depends(get_session)):
@@ -146,7 +150,6 @@ class Load_ALS_Class():
             #add all the documents into
             session.add_all(new_records)
             session.commit()
-            
             todaysdate=datetime.today().strftime("%Y-%m-%d")
 
             new_list=[]
@@ -180,15 +183,22 @@ class Load_ALS_Class():
             session.rollback()
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"error while loading leads to the als")
         
-    def load_leads_to_als_Request(session:Session=Depends(get_master_db_session)):
+    def load_leads_to_als_Request(leads_list:List,feeds_list:List,camp_code:str,session:Session=Depends(get_master_db_session)):
 
         try:
-
+            if len(leads_list)<10000:
+                return True
             return True
         except Exception as e:
             load_als_logger.critical(f"{str(e)}")
             return False
+    def data_load_to_info_table():
+        try:
 
+            return True
+        except Exception as e:
+            load_als_logger.error(f"{str(e)}")
+            return 
 
 def get_loader_als_loader_service()->Load_ALS_Class:
 

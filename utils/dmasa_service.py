@@ -166,6 +166,7 @@ class DMA_Class():
 
     def fetch_audit_ids_from_the_db(self,session:Session=Depends(get_session)):
 
+        
         try:
             #read data from the audit id table where the values read are not yet processed
             audit_id_stmt=select(dma_audit_id_table.audit_id,dma_audit_id_table.number_of_records).where(dma_audit_id_table.is_processed==False)

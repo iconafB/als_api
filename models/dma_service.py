@@ -28,6 +28,9 @@ class dma_records_table(SQLModel,table=True):
 
 #who processed it, connect these tables
 
+#need to add list name here to fetch it easily and populate the right tables
+#need to know when do we first use this table
+#have an that is a primary key and of serial type
 class dma_validation_data(SQLModel,table=True):
     id:str=Field(primary_key=True,nullable=False,default=None)
     fore_name:str=Field(nullable=False,default=None)
@@ -38,8 +41,10 @@ class dma_validation_data(SQLModel,table=True):
     is_processed:bool=Field(nullable=False,default=None)
     branch:str=Field(nullable=False,default=None)
     camp_code:str=Field(nullable=False,default=None)
+    list_name:str=Field(nullable=False,default=None)
+    list_id:str=Field(nullable=True,default=None)
     #This field can be initially set to False up until the dma returns than updated accordingly to True or False
-    opted_out:bool=Field(nullable=False,default=None)
+    opted_out:bool=Field(nullable=True,default=None)
 
 
 
