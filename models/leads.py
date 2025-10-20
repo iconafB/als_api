@@ -29,10 +29,10 @@ class rule_tables(SQLModel,table=True):
     rule_name:str=Field(default=None,nullable=False)
     created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
 
-class leads_history_table(SQLModel,table=True):
+class lead_history_tbl(SQLModel,table=True):
     #serial primary key, increment
     lead_pk:Optional[int]=Field(primary_key=True,default=None,nullable=False)
-    cell_number:str=Field(default=None,nullable=False)
+    cell:str=Field(default=None,nullable=False)
     camp_code:str=Field(default=None,nullable=False)
     date_used:datetime=Field(default=None,nullable=False)
     list_id:str=Field(default=None,nullable=False)

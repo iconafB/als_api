@@ -9,5 +9,11 @@ class CampaignRuleInput(SQLModel):
     salary:int
     min_age:int
     max_age:int
+
+class UpdateCampaignRulesResponse(BaseModel):
+    message:str
+    update_date:str
+class FetchRuleResponse(BaseModel):
+    message:str
     
 

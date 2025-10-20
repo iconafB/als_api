@@ -20,7 +20,7 @@ class CreateCampaignResponseMeassage(SQLModel):
 
 class LoadCampaign(BaseModel):
     branch:str
-    campaign_name:str
+    camp_code:str
 
 class CampaignSpec(SQLModel):
     id_number:str
@@ -49,3 +49,5 @@ class LoadCampaignResponse(BaseModel):
     dma_status_code:int
     load_dmasa_status:str
     number_of_leads_submitted:int
+
+

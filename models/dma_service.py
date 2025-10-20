@@ -9,7 +9,7 @@ class dma_audit_id_table(SQLModel,table=True):
     id:Optional[int] | None=Field(primary_key=True,default=None)
     audit_id:str=Field(nullable=False,default=None,index=True)
     number_of_records:int=Field(nullable=False,default=None)
-    notification_email:str=Field(nullable=False,default=None)
+    notification_email:str=Field(nullable=False,default=None,index=True)
     is_processed:bool=Field(nullable=True,default=False)
     is_sent_to_dedago:bool=Field(nullable=False,default=None)
     created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
@@ -31,6 +31,8 @@ class dma_records_table(SQLModel,table=True):
 #need to add list name here to fetch it easily and populate the right tables
 #need to know when do we first use this table
 #have an that is a primary key and of serial type
+
+#The branc code and camapign code can also go to the list tracker table and be removed from this table
 class dma_validation_data(SQLModel,table=True):
     id:str=Field(primary_key=True,nullable=False,default=None)
     fore_name:str=Field(nullable=False,default=None)
@@ -40,11 +42,27 @@ class dma_validation_data(SQLModel,table=True):
     #is fetched and check ifit's opted out or in
     is_processed:bool=Field(nullable=False,default=None)
     branch:str=Field(nullable=False,default=None)
+    #campaign code
     camp_code:str=Field(nullable=False,default=None)
-    list_name:str=Field(nullable=False,default=None)
-    list_id:str=Field(nullable=True,default=None)
+    #these values should not be here since
+    # list_name:str=Field(nullable=False,default=None)
+    # list_id:str=Field(nullable=True,default=None)
     #This field can be initially set to False up until the dma returns than updated accordingly to True or False
-    opted_out:bool=Field(nullable=True,default=None)
+    opted_out:bool=Field(nullable=True,default=None) 
+    created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
+
+
+class list_tracker_table(SQLModel,table=True):
+    id:Optional[int]=Field(primary_key=True,default=None,nullable=False)
+    list_name:str=Field(nullable=True,default=None,index=True)
+    list_id:str=Field(nullable=True,default=None)
+    camp_code:str=Field(nullable=True,default=None,index=True)
+    branch:str=Field(nullable=True,default=None)
+    audit_id:str=Field(nullable=True,default=None)
+    #rule name is the campaign code why should this thing be here, redundant must be removed when redesigning it
+    rule_name:str=Field(nullable=True,default=None)
+    created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
+
 
 
 

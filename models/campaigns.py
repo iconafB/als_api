@@ -47,3 +47,10 @@ class Deduped_Campaigns(SQLModel,table=True):
     created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
 
 
+class campaign_rules_tbl(SQLModel,table=True):
+    cr_code:Optional[int]=Field(primary_key=True,nullable=False,default=None)
+    camp_code:str=Field(nullable=False,default=None)
+    rule_code:str=Field(nullable=False,default=None)
+    date_rule_created:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
+    is_active:bool=Field(nullable=False,default=None)
+

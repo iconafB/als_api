@@ -51,6 +51,7 @@ def verify_token(token:str,credentials_exception):
 
 #get current user
 async def get_current_user(token:Annotated[str,Depends(oauth_scheme)]):
+    
     credential_exception=HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail=f"Could not validate credentials",headers={"WWW-Authenticate": "Bearer"})
     try:
         #nonsense replication of code verify token method would do easily
@@ -66,18 +67,16 @@ async def get_current_user(token:Annotated[str,Depends(oauth_scheme)]):
 async def get_current_active_user(current_user:Annotated[int,Depends(get_current_user)],session:Session=Depends(get_session)):
     
     credential_exception=HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail=f"Could not validate credentials",headers={"WWW-Authenticate": "Bearer"})
+    
     if current_user==None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="Inactive user")
     #get the current user
     user_query=select(users_table).where(users_table.id==current_user)
     #exceute the query and get user data
     user=session.exec(user_query).first()
-    print("print the user found")
-    print(user)
     #raise an exception if the user does not exist
     if user==None:
         raise credential_exception
-    
     return user
 
 #get the current user to secure the protected routes
