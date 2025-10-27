@@ -1,7 +1,6 @@
 from fastapi import APIRouter,HTTPException,Depends,UploadFile,File,Query,Request,status
 from sqlmodel import Session,select,update,delete
 from sqlalchemy import func,text
-
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.dialects import postgresql
 from typing import Annotated,List,Dict,Any
@@ -250,7 +249,7 @@ async def add_dedupe_list(camp_code:str,session:Session=Depends(get_session),use
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"Campaign with campaign code:{camp_code} does not exist or it is not a dedupe campaign")
         
         #extract the rule 
-        if campaign.camp_rule==None:
+        if not campaign.camp_rule==None:
             dedupe_logger.info(f"campaign rule for campaign:{campaign.camp_name} does not exist")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"campaign rule for campaign:{campaign.camp_name} does not exist")
         
@@ -275,7 +274,7 @@ async def add_dedupe_list(camp_code:str,session:Session=Depends(get_session),use
         #execute the query and fetch the users with
         fetched_leads=session.exec(select_query).fetchall()
 
-        if fetched_leads==None:
+        if not fetched_leads==None:
             dedupe_logger.info(f"zero leads match campaign:{campaign.camp_name} with code:{campaign.camp_code}")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"zero leads that matches this spec")
         
@@ -349,14 +348,10 @@ async def add_dedupe_list(camp_code:str,session:Session=Depends(get_session),use
 async def create_dedupe_campaign(req:Request,campaign:CreateDedupeCampaign,session:Session=Depends(get_session),user=Depends(get_current_user)):
     
     try:
-        #print the request object
-        print("print the request object first")
-        print(req)
-        #search if a dedupe campaign exist
-
+        
         deduped_campaign=session.exec(select(Deduped_Campaigns).where(Deduped_Campaigns.camp_name==campaign.campaign_name and Deduped_Campaigns.camp_code==campaign.campaign_code)).first()
 
-        if deduped_campaign==None:
+        if not deduped_campaign:
             dedupe_logger.info(f"campaign:{campaign.campaign_name} with campaign code:{campaign.campaign_code} already exist")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"campaign:{campaign.campaign_name} with campaign code:{campaign.campaign_code} already exist")
         
@@ -877,13 +872,11 @@ async def add_manual_dedupe_list2(filename:Annotated[UploadFile,File()],camp_cod
                 DO UPDATE SET extra_info=EXCLUDED.extra_info
                 WHERE info_tbl.cell = EXCLUDED.cell
              """
-        
         try:
             # insert and perform update 
             with engine.begin() as conn:
                 conn.execute(text(query),[{"cell":cell,"extra_info":info} for cell,info in update_data])
                 conn.close()
-
             dedupe_logger.info(f"inserted records of length:{len(update_data)} on the info_tbl(information table)")
 
         except Exception as e:

@@ -32,7 +32,9 @@ async def get_number_of_leads(campaign_name:str=Query(description="Please enter 
     except Exception as e:
         session.rollback()
         leads_logger.exception(f"An exception occurred while getting leads count:{e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"An internal server occurred while checking spec level for rule code:{rule_code}")    
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"An internal server occurred while checking spec level for rule code provided")    
+
+
     # leads=LeadsCount(message="Leads Fetched Successfully",number=count)
     # return leads
 
@@ -42,9 +44,7 @@ async def get_number_of_leads(campaign_name:str=Query(description="Please enter 
 async def check_spec_levels(rule_code:int,last_used:str,session:Session=Depends(get_session)):
     try:
         rules_code_query=select(rules_tbl).where(rules_tbl.rule_code==rule_code)
-
         rule=session.exec(rules_code_query).first()
-
         if not rule:
             leads_logger.info(f"No rule code exist that matches rule code:{rule_code}")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"No rule code exist that matches rule code:{rule_code}")
@@ -68,7 +68,6 @@ async def check_spec_levels(rule_code:int,last_used:str,session:Session=Depends(
             leads_logger.info(f"no leads for rule code:{rule_code} meets the campaign spec")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"No leads meet the spec level of:{rule_code}")
         leads_length=len(leads)
-
         return SpecLevel(status=True,specLevel=leads_length,message=f"number of leads meeting the spec level:{rule_code} is {leads_length}")
     
     except Exception as e:

@@ -31,6 +31,7 @@ def send_pings_to_dedago(list_numbers:None):
         return dedago_response
     
     except Exception as e:
+        pings_logger.exception(f"an exception occurred while sending pings to dedago:{e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"{e}")
     
 

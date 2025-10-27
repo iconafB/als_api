@@ -6,7 +6,6 @@ DATABASE_URL=f"postgresql+psycopg2://{get_settings().database_owner}:{get_settin
 #create engine for connecting to the database
 engine=create_engine(DATABASE_URL,echo=True)
 #define the method for creating the tables
-
 #create all the tables at startup 
 def create_db_and_tables():
     SQLModel.metadata.create_all(engine)

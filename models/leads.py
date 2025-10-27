@@ -3,7 +3,6 @@ from sqlmodel import SQLModel,Field
 from typing import Optional
 from datetime import datetime
 
-
 class info_tbl(SQLModel,table=True):
     cell:Optional[str]=Field(primary_key=True,nullable=False,default=None)
     id:str=Field(nullable=False,default=None)
@@ -33,17 +32,17 @@ class lead_history_tbl(SQLModel,table=True):
     list_name:str=Field(default=None,nullable=False)
     load_type:str=Field(default=None,nullable=False)
     rule_code:int=Field(default=None,nullable=False)
-    created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
+    #created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
 
     #rule code is on the table, pay attention to it
 
 
 class car_tbl(SQLModel,table=True):
-    cell_number:str=Field(primary_key=True,default=None,nullable=False)
+    cell:str=Field(primary_key=True,default=None,nullable=False)
     make:str=Field(default=None,nullable=False)
     model:str=Field(default=None,nullable=False)
     year:str=Field(default=None,nullable=False)
-    created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
+    #created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
 
 
 class employment_tbl(SQLModel,table=True):

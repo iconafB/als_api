@@ -74,7 +74,7 @@ async def load_campaign(load_campaign:LoadCampaign,camp_code:str=Path(...,descri
         campaign=session.exec(load_campaign_stmt).first()
 
         #if the campaign does not exist notify the use
-        if campaign==None:
+        if not campaign:
             campaigns_logger.info(f"campaign:{camp_code} does not exist")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"campaign:{camp_code} does not exist")
         

@@ -212,7 +212,8 @@ async def fetch_rule_code(rule_name:str=Path(...,description="Provide the campai
     try:
         rule_name_query=select(rules_tbl).where(rules_tbl.rule_name==rule_name)
         rule_name_entry=session.exec(rule_name_query).first()
-        if rule_name_entry==None:
+
+        if not rule_name_entry:
             campaign_rules_logger.info(f"user with id:{user.id} and email:{user.email} requested a campaign with rule name:{rule_name}")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"campaign rule with:{rule_name} does not exist")
         return rule_name_entry
@@ -229,7 +230,7 @@ async def change_rule_code(rule_name:int,rule_code:str,session:Session=Depends(g
         #find the campaign rule using the rule name
         rule_query=select(rules_tbl).where(rules_tbl.rule_name==rule_name)
         rule=session.exec(rule_query).first()
-        if rule==None:
+        if not rule:
             campaign_rules_logger.info(f"user: {user.id}, email:{user.email} requested a change in rule name:{rule_name} but it does not exist")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"user: {user.id}, email:{user.email} requested a change in rule name:{rule_name} but it does not exist")
         

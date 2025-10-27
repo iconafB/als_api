@@ -34,7 +34,6 @@ def on_start():
 
 @app.get("/")
 async def health_check():
-
     return {"main":"test the als endpoints"}
 
 app.include_router(auth_router)
