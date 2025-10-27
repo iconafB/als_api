@@ -6,8 +6,9 @@ import json
 from settings.Settings import get_settings
 #I don't remember why is this here
 import urllib3
-from utils.load_als_service import get_loader_als_loader_service
-from utils.emails_service import send_email
+#from utils.load_als_service import get_loader_als_loader_service
+
+#from utils.emails_service import send_email
 import pandas as pd
 #update the audit id on this table to avoid processing already used ids
 from models.dma_service import dma_audit_id_table
@@ -22,6 +23,7 @@ dma_logger=define_logger("dmasa ","logs/dma.log")
 class DMA_Class():
     
     def __init__(self):
+
         self.dmasa_api_key=get_settings().dmasa_api_key
         self.dmasa_member_id=get_settings().dmasa_member_id
         self.check_credits_dmasa_url=get_settings().check_credits_dmasa_url
@@ -184,7 +186,7 @@ class DMA_Class():
                     no_optouts=[value for value in status_response if value['OptedOut']=='True']
 
                     return no_optouts
-                
+                #continue looping to another audit id
                 elif status_response==False:
                     continue
 
@@ -205,10 +207,10 @@ class DMA_Class():
         
         #check dedupe status
         status_response=self.check_dedupe_status(audit_id,number_of_records)
-        #
+        #check if the download is ready and the status code is 200 and there are no errors on the Errors list
         if status_response.json()['Status']=='Download Ready' and status_response.status_code==200 and len(status_response.json()['Errors'])==0:
             
-            #Fetch the audit id table ,using the given audit id to update the is processed flag to true meaning records for that audit id have been processed
+            #Fetch the audit id table entry that matches the given audit id ,use it to update the is processed flag to true meaning records for that audit id have been processed
 
             audit_id_table_query=select(dma_audit_id_table).where(dma_audit_id_table.audit_id==audit_id)
             
@@ -218,14 +220,15 @@ class DMA_Class():
             if execute_audit_id_table==None:
                 dma_logger.info(f"Audit ID:{audit_id} does not exist,no processing can be performed")
                 # raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"Audit ID:{audit_id} does not exist,no processing can be peformed")
-                return
+                return False
             
             #update the is_processed flag from dma_audit_table table,meaning that the these records have undergone the dma process
             execute_audit_id_table.is_processed=True
             #add it to the session object and commit the changes
             session.add(execute_audit_id_table)
             session.commit()
-            #read the dma output for the dedupe 
+
+            #read the dma output for the dma records sent 
             
             records_response=self.read_dedupe_output(audit_id)
 
@@ -237,34 +240,32 @@ class DMA_Class():
                 #record errors occurred on the dma
                 for error_record in len(records_response.json()['Errors']):
                     dma_logger.error(f"{error_record}")
-                return
+                return False
             
             #take the list of actual records from the dmasa api endpoint
+
             dedupe_records=records_response.json()['ReadOutput']
 
             #append zero on all the numbers from dmasa, slow find another approach
 
             for record in dedupe_records:
-
-                print("records retrieved from dmasa")
+                print(f"Phone Number:{0+record['DataEntry']}")
                 #append zeros on the numbers returned from dmasa
-
                 record['DataEntry'] = '0'+ record['DataEntry']
 
             #unnecessary database call/query
 
             #make a database call to fetch information that was previously stored with the same audit id and is not processed
+            
             submitted_records_query=select(dma_validation_data).where((dma_validation_data.audit_id==audit_id) & (dma_validation_data.is_processed==False))
             
             #execute the query to fetch the list of tuples from the db
             submitted_records=session.exec(submitted_records_query).all()
             #do the comparison here than submit to dedago and update the status
-            #dedupe_records
-
             #data cleaning using the dedupe_records list from dmasa
 
             data_map={item["DataEntry"]:item["OptedOut"] for item in dedupe_records}
-            #data cleaning for small records
+            #data cleaning for small records,process small records
 
             if len(dedupe_records)<10000:
 
@@ -272,12 +273,13 @@ class DMA_Class():
 
                     if record.cell in data_map:
                         record.is_processed=True
-                        
+
                         opt_out_value=data_map[record.cell]
                         record.opted_out=bool(opt_out_value) and str(opt_out_value).lower()=="true"
                 
                 session.commit()
-            #process in batches
+            
+            #process in batches for large number of records
             dma_batch_size=10000
 
             for i in range(0,len(dedupe_records),dma_batch_size):
@@ -383,10 +385,11 @@ class DMA_Class():
     async def send_email_for_dma_credits(self):
 
         if self.check_credits().json()['Credits'] < 500 and self.check_credits().status_code==200:
-            
-            await send_email()
-        
+           #await send_email()
+           return True
         return
+
 
 def get_dmasa_service():
     return DMA_Class()
+

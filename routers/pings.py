@@ -1,5 +1,5 @@
 from fastapi import APIRouter,status,HTTPException,UploadFile,File
-from models.pings import pings_table
+from models.pings import pings_tbl
 import pandas as pd
 from sqlmodel import SQLModel,select
 from utils.pings import send_pings_to_dedago
@@ -9,6 +9,7 @@ from utils.logger import define_logger
 ping_router=APIRouter(tags=["Pings Endpoints"],prefix="/pings")
 
 pings_logger=define_logger("als pings logs","logs/pings.log")
+
 #get submit pings to dedago
 @ping_router.post("submit-pings",description="Get All Pings")
 

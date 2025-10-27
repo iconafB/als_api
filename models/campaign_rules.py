@@ -5,38 +5,26 @@ from sqlalchemy import func
 
 #assign a sql rule to a campaign
 
-class campaign_rules(SQLModel,table=True):
-    id:Optional[int]=Field(primary_key=True,default=None)
-    rule_code:str=Field(nullable=False,default=None)
-    camp_code:str=Field(nullable=False,default=None)
-    min_salary:int=Field(nullable=False,default=None)
-    max_salary:int=Field(nullable=False,default=None)
-    min_age:int=Field(nullable=False,default=None)
-    max_age:int=Field(nullable=False,default=None)
-    cell_number_checked:bool=Field(default=True,nullable=True)
-    id_number_checked:bool=Field(default=True,nullable=True)
-    gender:str=Field(nullable=False,default=None)
-    city:str=Field(nullable=False,default=None)
-    province:str=Field(nullable=False,default=None)
-    is_active:bool=Field(nullable=False,default=True)
-    created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
 
+#final
 class rules_tbl(SQLModel,table=True):
     rule_code:Optional[int]=Field(primary_key=True,default=None)
     rule_name:str=Field(nullable=False,default=None)
-    rule_sql:Dict[str,Any]=Field(sa_column=Column(JSON))
-    rule_location:str=Field(nullable=True,default=None)
-    created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False)
+    #rule_sql:str=Field(nullable=True,default=None)
+    rule_location:str=Field(nullable=True,default="")
+    salary:int=Field(nullable=True,default=0)
+    gender:str=Field(nullable=True,default="")
+    birth_year_start:int=Field(nullable=True,default=2025)
+    birth_year_end:int=Field(nullable=True,default=2025)
+    last_used:int=Field(nullable=True,default=29)
+    limit:int=Field(nullable=True,default=10000)
+    #created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False)
 
 
-
-
-
-class campaign_rules(SQLModel,table=True):
-    
+class dedupe_campaign_rules_tbl(SQLModel,table=True):
     rule_code:Optional[int]=Field(primary_key=True,default=None)
     rule_name:str=Field(nullable=False,default=None)
-    rule_values:Dict[str,Any]=Field(nullable=True,default=None)
-    created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
-
-
+    salary:int=Field(nullable=True,default=None)
+    gender:str=Field(nullable=True,default=None)
+    derived_income:int=Field(nullable=True,default=None)
+    limit:int=Field(nullable=True,default=None)

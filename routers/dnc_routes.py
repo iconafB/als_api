@@ -21,24 +21,32 @@ async def add_to_blacklist(bg_tasks:BackgroundTasks,camp_code:str=Query(...,desc
         list_contents=pd.DataFrame(contents.splitlines()).values().tolist()
 
         list_to_dnc=[]
+        new_list=[str(new[0],'UTF-8') for new in list_contents]
 
-        for list_content in list_contents:
-            new=str(list_content[0],'UTF-8')
+        #dnc_list=[new for new in new_list if re.match('^\d{10}$',new)]
 
-            if re.match('^\d{10}$',new):
-                list_to_dnc.append(new)
+        dnc_list=[str(item[0],'UTF-8') for item in list_contents if re.match('^\d{10}$',str(item[0],'UTF-8'))]
+
+        # for list_content in list_contents:
+
+        #     new=str(list_content[0],'UTF-8')
+
+        #     if re.match('^\d{10}$',new):
+        #         list_to_dnc.append(new)
         
-        if len(list_to_dnc)>0:
+
+        if len(dnc_list)>0:
             status=True
-            result=str(len(list_to_dnc)) + 'records added to the dnc'
-            bg_tasks.add_task(send_dnc_list_to_db,list_to_dnc,camp_code)
+            result=str(len(dnc_list)) + 'records added to the dnc'
+            bg_tasks.add_task(send_dnc_list_to_db,dnc_list,camp_code)
             #add this to the dnc using a background task
         
         else:
             status=False
-            result=str(len(list_to_dnc)) + 'records added to the dnc'
+            result=str(len(dnc_list)) + 'records added to the dnc'
 
-        dnc_logger.info(f"{len(list_to_dnc)} numbers added to the dnc list")
+        dnc_logger.info(f"{len(dnc_list)} numbers added to the dnc list")
+
         return DNCNumberResponse(status=status,message=result)
     
     except Exception as e:

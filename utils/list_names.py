@@ -1,7 +1,7 @@
 from fastapi import Depends,HTTPException,status
 from sqlalchemy import distinct,func
 from database.database import get_session
-from models.leads import lead_history_table
+from models.leads import lead_history_tbl
 from sqlmodel import Session,select
 from datetime import datetime
 from utils.logger import define_logger
@@ -16,7 +16,7 @@ def get_list_names(camp_code:str,session:Session=Depends(get_session)):
         current_date=datetime.now().strftime("%Y-%m-%d")
         #test the current time
         #query the leads history table using the campaign name and the present date
-        leads_query_count=select(func.count(distinct(lead_history_table.list_name))).where(lead_history_table.camp_code==camp_code and lead_history_table.created_at==current_date)
+        leads_query_count=select(func.count(distinct(lead_history_tbl.list_name))).where((lead_history_tbl.camp_code==camp_code) & (lead_history_tbl.created_at==current_date))
         #execute the query
         execute_the_leads_count_query=session.exec(leads_query_count)
         

@@ -13,6 +13,21 @@ class CreateDedupeCampaign(BaseModel):
     gender:Optional[str]=None
     limit:Optional[int]=None
 
+class CreateDedupeCampaign(BaseModel):
+    branch:str
+    camp_code:str
+    campaign_name:str
+
+class UpdateDedupeCampaign(BaseModel):
+    branch:str
+    camp_code:str
+    camp_name:str
+
+
+class DeleteCamapignSchema(BaseModel):
+    campaign_code:str
+    message:str
+
 class SubmitDedupeReturnSchema(BaseModel):
     campaign_name:str
     campaign_code:str
@@ -20,7 +35,14 @@ class SubmitDedupeReturnSchema(BaseModel):
 
 class ManualDedupeListReturn(BaseModel):
     Success:bool
+    Information_Table:str
+    Campaign_Dedupe_Table:str
     Key:str
+
+
+
+
+
 
 class StatusData(BaseModel):
     idnum:Optional[str]=None

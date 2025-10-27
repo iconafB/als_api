@@ -1,6 +1,7 @@
-from fastapi import APIRouter,HTTPException,status,Depends,UploadFile,File,Query,Request,Query
+from fastapi import APIRouter,HTTPException,Depends,UploadFile,File,Query,Request,status
 from sqlmodel import Session,select,update,delete
-from sqlalchemy import func
+from sqlalchemy import func,text
+
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.dialects import postgresql
 from typing import Annotated,List,Dict,Any
@@ -14,20 +15,151 @@ import string
 import time
 from sqlalchemy import insert,and_,or_
 from sqlalchemy.sql import func
-
 from datetime import datetime
-from models.campaigns import Campaign_Dedupes,Deduped_Campaigns
-from models.leads import information_table
-from schemas.dedupe_campaigns import CreateDedupeCampaign,SubmitDedupeReturnSchema,ManualDedupeListReturn,StatusData,EnrichedData
+from models.campaigns import Campaign_Dedupe,Deduped_Campaigns,dedupe_campaigns_tbl
+from models.leads import info_tbl
+from schemas.dedupe_campaigns import CreateDedupeCampaign,SubmitDedupeReturnSchema,ManualDedupeListReturn,StatusData,EnrichedData,CreateDedupeCampaign,DeleteCamapignSchema,UpdateDedupeCampaign
 from database.database import get_session
-from utils.auth import get_current_user
+from utils.auth import get_current_user,get_current_active_user
+from utils.status_data import get_status_tuple,insert_data_into_finance_table,insert_data_into_location_table,insert_data_into_contact_table,insert_data_into_employment_table,insert_data_into_car_table
+from database.database import engine
+
 from utils.logger import define_logger
 from schemas.dedupes import DataInsertionSchema
-
+from schemas.status_data_routes import InsertStatusDataResponse,InsertEnrichedDataResponse
 
 dedupe_logger=define_logger("als dedupe campaign logs","logs/dedupe_route.log")
 
+status_data_logger=define_logger("als status logger logs","logs/status_data.log")
+
 dedupe_routes=APIRouter(tags=["Dedupes"],prefix="/dedupes")
+#dedupe campaign crud
+@dedupe_routes.post("",status_code=status.HTTP_201_CREATED,description="create dedupe campaign by provide the campaign name,campaign code and branch",response_model=dedupe_campaigns_tbl)
+
+async def create_dedupe_campaign(dedupe:CreateDedupeCampaign,session:Session=Depends(get_session),user=Depends(get_current_active_user)):
+    try:
+        dedupe_campaign_query=select(dedupe_campaigns_tbl).where((dedupe_campaigns_tbl.camp_code==dedupe.camp_code)&(dedupe_campaigns_tbl.campaign_name==dedupe.campaign_name)&(dedupe_campaigns_tbl.branch==dedupe.branch))
+        dedupe_campaign=session.exec(dedupe_campaign_query).first()
+
+        if not dedupe_campaign:
+            dedupe_logger.info(f"user:{user.id} with email:{user.email} attempted to create:{dedupe.campaign_name} with campaign code:{dedupe.camp_code} at branch:{dedupe.branch}")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=f"dedupe campaign:{dedupe.campaign_name} already exist")
+        payload=dedupe.model_dump()
+        campaign=dedupe_campaigns_tbl.model_validate(payload)
+        session.add(campaign)
+        session.commit()
+        session.refresh(campaign)
+        dedupe_logger.info(f"user:{user.id} with email:{user.email} created campaign:{dedupe.campaign_name} with campaign code:{dedupe.camp_code} at branch:{dedupe.branch}")
+        return campaign
+    
+    except Exception as e:
+        dedupe_logger.error(f"{str(e)}")
+        session.rollback()
+        return HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"error occurred while creating dedupe campaign:{dedupe.campaign_name} with campaign code:{dedupe.camp_code} for branch:{dedupe.branch}")
+
+
+
+@dedupe_routes.get("/{camp_code}",description="Get dedupe campaign by providing the campaign code",status_code=status.HTTP_200_OK,response_model=dedupe_campaigns_tbl)
+
+async def get_dedupe_campaign(camp_code:str,session:Session=Depends(get_session),user=Depends(get_session)):
+    try:
+        #find the campaign using campaign code
+        campaign_query=select(dedupe_campaigns_tbl).where(dedupe_campaigns_tbl.camp_code==camp_code)
+        
+        campaign=session.exec(campaign_query).first()
+
+        if not campaign:
+            dedupe_logger.info(f"user:{user.id} with email:{user.email} requested campaign:{camp_code} and it does not exist")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"campaign:{camp_code} does not exist")
+        
+        return campaign
+    
+    except Exception as e:
+        dedupe_logger.error(f"{str(e)}")
+        return HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"An internal server error occuurred while retrieving campaign:{camp_code}")
+
+
+#get all dedupe campaigns
+
+@dedupe_routes.get("",description="Get all dedupe camapigns",status_code=status.HTTP_200_OK,response_model=List[dedupe_campaigns_tbl])
+
+async def get_all_dedupe_campaigns(session:Session=Depends(get_session),user=Depends(get_current_user)):
+    try:
+        dedupe_logger.info(f"user:{user.id} with email:{user.email} retrieved all the dedupe campaigns")
+        all_campaigns_query=select(dedupe_campaigns_tbl)
+        all_dedupe_campaign=session.exec(all_campaigns_query).all()
+        
+        return all_dedupe_campaign
+    
+    except Exception as e:
+        dedupe_logger.error(f"{str(e)}")
+        return HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error occurred while fetching dedupe campaigns")
+
+#get active dedupe campaigns
+@dedupe_routes.get("/active",status_code=status.HTTP_200_OK,description="Get all active dedupe campaigns",response_model=List[dedupe_campaigns_tbl])
+
+async def get_active_dedupe_campaigns(session:Session=Depends(get_session),user=Depends(get_current_active_user)):
+    try:
+        active_dedupe_campaign_queries=select(dedupe_campaigns_tbl).where(dedupe_campaigns_tbl.is_active==True)
+        active_dedupe_campaigns=session.exec(active_dedupe_campaign_queries).all()
+
+        dedupe_logger.info(f"user:{user.id} with email:{user.email} retrieved {len(active_dedupe_campaigns)} dedupe campaigns")
+
+        return active_dedupe_campaigns
+    except Exception as e:
+        dedupe_logger.error(f"{str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"An internal server error occurred while fetching all active campaigns")
+
+#deactivate/delete campaigns
+@dedupe_routes.patch("/delete/{camp_code}",status_code=status.HTTP_202_ACCEPTED)
+
+async def delete_dedupe_campaign(camp_code:str,session:Session=Depends(get_session),user=Depends(get_current_active_user)):
+    try:
+        campaign_query=select(dedupe_campaigns_tbl).where((dedupe_campaigns_tbl.camp_code==camp_code)&(dedupe_campaigns_tbl.is_active==True))
+        campaign=session.exec(campaign_query).first()
+        if not campaign:
+            dedupe_logger.info(f"campaign with campaign code:{camp_code} does not exist")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"camapign with campaign code:{camp_code} does not exist")
+        campaign.is_active=False
+        session.add(campaign)
+        session.commit()
+        dedupe_logger.info(f"user:{user.id} with email:{user.email} deleted dedupe campaign with code:{camp_code}")
+        return DeleteCamapignSchema(campaign_code=camp_code,message=f"Dedupe campaign:{camp_code} deleted")
+    except Exception as e:
+        dedupe_logger.error(f"{str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"An internal server error occurred while deleting dedupe campaign:{camp_code}")
+
+#update campaign names,codes and branch should only be done by the db administrator
+
+@dedupe_routes.patch("/update/{camp_code}",status_code=status.HTTP_200_OK,description="Update campaign name,campaign code,or branch only provide the field you want to update",response_model=dedupe_campaigns_tbl)
+
+async def update_campaign(campaign:UpdateDedupeCampaign,session:Session=Depends(get_session),user=Depends(get_current_active_user)):
+    try:
+        campaign_query=select(dedupe_campaigns_tbl).where(dedupe_campaigns_tbl.camp_code==campaign.camp_code)
+        campaign_found=session.exec(campaign_query).first()
+        if not campaign_found:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"campaign:{campaign.camp_code}")
+        update_campaign=campaign.dict(exclude_unset=True)
+        for key,value in update_campaign.items():
+            setattr(campaign_found,key,value)
+        session.commit()
+        session.refresh(campaign_found)
+        dedupe_logger.info(f"dedupe campaign:{campaign.camp_code} with campaign name:{campaign.camp_name} updated by user:{user.id} with email:{user.email}")
+        return campaign_found
+    except Exception as e:
+        dedupe_logger.error(f"{str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"An internal server error occurred while updating the campaign:{campaign.camp_code}")
+
+#load dedupe campaign
+
+@dedupe_routes.post("")
+
+async def load_dedupe_campaign():
+    try:
+        return True
+    except Exception as e:
+        dedupe_logger.error(f"{str(e)}")
+        return HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"error occurred while loading the campaign")
 
 @dedupe_routes.post("/add-dedupes-manually",status_code=status.HTTP_200_OK)
 
@@ -69,14 +201,14 @@ async def add_dedupes_manually(campaign_name:str=Query(description="Please provi
             #insert the data into the campaign_dedupe using bulk insert, we still need the campaign name and is_verified field filled
             data_to_insert=[
                 {
-                    "id_number":row[0],
-                    "cell_number":row[1],
+                    "id":row[0],
+                    "cell":row[1],
                     "campaign_codes":campaign_name,
                     "is_verified":True
                 }
                 for row in all_rows
             ]
-            session.bulk_insert_mappings(Campaign_Dedupes,data_to_insert)
+            session.bulk_insert_mappings(Campaign_Dedupe,data_to_insert)
             session.commit()
             session.close()
 
@@ -124,20 +256,20 @@ async def add_dedupe_list(camp_code:str,session:Session=Depends(get_session),use
         
         #fetch leads id and cell number from the information table
         #construct a dynamic sql query
-        select_query=select(information_table.id_number,information_table.cell_number)
+        select_query=select(info_tbl.id,info_tbl.cell)
 
         if campaign.camp_rule.gender is not None:
 
-            select_query=select_query.where(information_table.gender==campaign.camp_rule.gender)
+            select_query=select_query.where(info_tbl.gender==campaign.camp_rule.gender)
 
         if campaign.camp_rule.derived_income is not None:
-            select_query=select_query.where(information_table.derived_income>=campaign.camp_rule.derived_income)
+            select_query=select_query.where(info_tbl.derived_income>=campaign.camp_rule.derived_income)
 
         if campaign.camp_rule.minimum_salary is not None:
-            select_query=select_query.where(information_table.salary>=campaign.camp_rule.minimum_salary)
+            select_query=select_query.where(info_tbl.salary>=campaign.camp_rule.minimum_salary)
         
         if campaign.camp_rule.maximum_salary is not None:
-            select_query=select_query.where(information_table.salary<=campaign.camp_rule.maximum_salary)
+            select_query=select_query.where(info_tbl.salary<=campaign.camp_rule.maximum_salary)
         
         #consider date for the following query
         #execute the query and fetch the users with
@@ -163,7 +295,7 @@ async def add_dedupe_list(camp_code:str,session:Session=Depends(get_session),use
         updated_data=[(data[0],data[1],'P',key) for data in fetched_leads]
 
         campaign_object=[
-            Campaign_Dedupes(id_number=data[0],cell_number=data[1],campaign_name=camp_code,status=data[2],code=data[3]) for data in updated_data
+            Campaign_Dedupe(id=data[0],cell=data[1],campaign_name=camp_code,status=data[2],code=data[3]) for data in updated_data
         ]  
 
 
@@ -181,7 +313,7 @@ async def add_dedupe_list(camp_code:str,session:Session=Depends(get_session),use
         informatable_data=[(data[1],'DEDUPE')for data in fetched_leads]
 
         #Insert data into the information table
-        information_object=[information_table(cell_number=data[0],extra_info=data[1]) for data in informatable_data]
+        information_object=[info_tbl(cell=data[0],extra_info=data[1]) for data in informatable_data]
         
         #Bulk insert into the information table
         session.add(information_object)
@@ -243,6 +375,9 @@ async def create_dedupe_campaign(req:Request,campaign:CreateDedupeCampaign,sessi
         dedupe_logger.critical(f"error:{e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error occurred while creating a dedupe campaign")
 
+
+
+
 #submit dedupe return route
 
 @dedupe_routes.post("/submit-dedupe-return",status_code=status.HTTP_200_OK)
@@ -257,6 +392,10 @@ async def submit_dedupe_return(data:SubmitDedupeReturnSchema,dedupe_file:UploadF
 
         dedupe_list=[]
 
+        dedupe_list2=[str(d[0],'UTF-8') for d in list_contents]
+
+        new_tuple_list=[d for d in dedupe_list2 if re.match('^\d{13}$',d)]
+
         for list in list_contents:
             #new tuple
             new_tuple=str(list[0],'UTF-8')
@@ -264,14 +403,17 @@ async def submit_dedupe_return(data:SubmitDedupeReturnSchema,dedupe_file:UploadF
                 dedupe_list.append(new_tuple)
 
         #search for dedupe campaign that matches the campaign code
-        dedupe_query=select(Campaign_Dedupes.code).where(Campaign_Dedupes.code==data.code)
+        dedupe_query=select(Campaign_Dedupe.code).where(Campaign_Dedupe.code==data.code)
+
         exec_dedupe_query=session.exec(dedupe_query).all()
         #raise an exception if the query fails
+
         if exec_dedupe_query==None:
             dedupe_logger.info(f"campaign dedupe:{data.campaign_name} with code:{data.code} does not exist")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"campaign dedupe:{data.campaign_name} with code:{data.code}")
+        
         #count the number of campaigns returned
-        campaign_count_query=(select(func.count()).select_from(Campaign_Dedupes).where(Campaign_Dedupes.code==data.code))
+        campaign_count_query=(select(func.count()).select_from(Campaign_Dedupe).where(Campaign_Dedupe.code==data.code))
         #this value can also be zero,must be zero
 
         campaign_count=session.exec(campaign_count_query).scalar_one()
@@ -279,14 +421,16 @@ async def submit_dedupe_return(data:SubmitDedupeReturnSchema,dedupe_file:UploadF
         #search the dedupe campaign
         dedupe_campaign_stmt=select(Deduped_Campaigns).where(Deduped_Campaigns.camp_code==data.campaign_code)
         
-        dedupe_campaign_query=session.exec(dedupe_campaign_stmt).first()
+        dedupe_campaign=session.exec(dedupe_campaign_stmt).first()
 
         camp_found=False
 
-        if dedupe_campaign_query==None:
+        if dedupe_campaign==None:
+
             camp_found=False
             dedupe_logger.info(f"campaign:{data.campaign_name} with campaign code:{data.campaign_code} does not exist or is not a dedupe campaign")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"dedupe campaign:{data.campaign_name} with campaign code:{data.campaign_code} does not exist")
+        
         else:
             camp_found=True
         
@@ -311,7 +455,7 @@ async def submit_dedupe_return(data:SubmitDedupeReturnSchema,dedupe_file:UploadF
         database_list=tuple(dedupe_list)
 
         #update statement query, questinable
-        update_statement=(update(Campaign_Dedupes).values(status='R').where(Campaign_Dedupes.code==data.code,Campaign_Dedupes.id.in_(database_list)))
+        update_statement=(update(Campaign_Dedupe).values(status='R').where(Campaign_Dedupe.code==data.code,Campaign_Dedupe.id.in_(database_list)))
         #execute the query
         session.exec(update_statement)
         #commit the session
@@ -319,7 +463,7 @@ async def submit_dedupe_return(data:SubmitDedupeReturnSchema,dedupe_file:UploadF
         #poll the session object for any error in committing the object
         #select id from campaign_dedupe where status is 'P' and code matches the supplied 
         
-        id_query_from_campaign_dedupe=select(Campaign_Dedupes.id_number).where(Campaign_Dedupes.code==data.code and Campaign_Dedupes.status=='P')
+        id_query_from_campaign_dedupe=select(Campaign_Dedupe.id).where(Campaign_Dedupe.code==data.code and Campaign_Dedupe.status=='P')
         
         id_campaign_dedupe_query_exec=session.exec(id_query_from_campaign_dedupe).all()
         #count the number of ids fetched
@@ -337,9 +481,9 @@ async def submit_dedupe_return(data:SubmitDedupeReturnSchema,dedupe_file:UploadF
 
         if id_database_list_count > 0:
             #delete statement,questionable in_ operator
-            delete_statement=delete(Campaign_Dedupes).where(Campaign_Dedupes.id.in_(id_database_list))
+            delete_statement=delete(Campaign_Dedupe).where(Campaign_Dedupe.id.in_(id_database_list))
             #update sql statement
-            update_statement=update(information_table).where(information_table.id.in_(id_database_list)).values(extra_info=None)
+            update_statement=update(info_tbl).where(info_tbl.id.in_(id_database_list)).values(extra_info=None)
             #delete session
             session.exec(delete_statement)
             session.commit()
@@ -350,7 +494,7 @@ async def submit_dedupe_return(data:SubmitDedupeReturnSchema,dedupe_file:UploadF
 
         #delete statement on campaign dedupes where code = 'U'
 
-        delete_statement_code_u=delete(Campaign_Dedupes).where(Campaign_Dedupes.code=='U')
+        delete_statement_code_u=delete(Campaign_Dedupe).where(Campaign_Dedupe.code=='U')
 
         session.exec(delete_statement_code_u)
         session.commit()
@@ -360,14 +504,18 @@ async def submit_dedupe_return(data:SubmitDedupeReturnSchema,dedupe_file:UploadF
             "Success":True
         }
     
+
+
+    
     except Exception as e:
         dedupe_logger.critical(f"{e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error:{e}")
     
 #insert status data
 
-@dedupe_routes.post("/insert_status_data",status_code=status.HTTP_200_OK)
+@dedupe_routes.post("/insert_status_data",status_code=status.HTTP_200_OK,response_model=InsertStatusDataResponse)
 #return the time taken for the queries, number of leads affected
+
 async def insert_status_data(filename:str=Query(...,description="Provided the name of the filename with status data"),session:Session=Depends(get_session)):
     try:
         delta_time_1=time.time()
@@ -376,6 +524,7 @@ async def insert_status_data(filename:str=Query(...,description="Provided the na
         #check if the file exists
         if not os.path.exists(filename):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"filename:{filename} does not exist on this system")
+        
         #read the csv file into the pandas dataframe
         status_dataframe=pd.read_csv(filename)
         # convert the csv data into a list
@@ -390,14 +539,17 @@ async def insert_status_data(filename:str=Query(...,description="Provided the na
         total_time=delta_time2 - delta_time_1
         #rows list 
         rows=[]
+        status_data=['0'+ str(row[15]) for row in status_data]
 
         for row in status_data:
+            
             cell='0'+str(row[15])
+
             if re.match('^(\d{10})?$', str(cell)):
 
                 if row[1] is not None:
                     date_created_old=row[1].split('')[0]
-
+                #test the id number if its has 13 characters
                 idnum=str(row[3])
                 salary=str(row[2])
                 name = row[6]
@@ -433,18 +585,77 @@ async def insert_status_data(filename:str=Query(...,description="Provided the na
 
                 #append the dictionary
                 rows.append(result.model_dump())
-                
+             
             #test the rows list if it has the right information
+            
             #run queries by making updates on the information table,location table,contact table,employment table,car_table,finance table
-        #execute the queries hard coded on the file
-        return True
-    except Exception as e:
+        
+        for i in range(5):
 
+            if i==1:
+                insert_list=get_status_tuple(rows,i)
+                if insert_list==False:
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error occurred")
+                
+                response=insert_data_into_finance_table(insert_list)
+                if response==False:
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"an error occurred while updating the finance table")
+
+            elif i==2:
+                insert_list=get_status_tuple(rows,i)
+                if insert_list==False:
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error occurred")
+
+                response=insert_data_into_location_table(insert_list)
+                if response==False:
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error occurred")
+
+            elif i==3:
+                insert_list=get_status_tuple(rows,i)
+                if insert_list==False:
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error occurred")
+
+                response=insert_data_into_contact_table(insert_list)
+                if response==False:
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error occurred")
+
+            elif i==4:
+                insert_list=get_status_tuple(rows,i)
+
+                if insert_list==False:
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error occurred")
+
+                response=insert_data_into_employment_table(insert_list)
+                if response==False:
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error occurred")
+
+            elif i==5:
+                insert_list=get_status_tuple(rows,i)
+                if insert_list==False:
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error occurred")
+
+                response=insert_data_into_car_table(insert_list)
+                if response==False:
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error occurred")
+
+            else:
+                insert_list=get_status_tuple(rows,i)
+                if insert_list==False:
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error occurred")
+
+                response=insert_data_into_finance_table(insert_list)
+                if response==False:
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error occurred")
+
+        status_data_logger.info(f"{len(rows)} updated on finance, car , location, employment, and finance table(e)")
+        return InsertStatusDataResponse(number_of_leads=leads_total,status=True,time_taken=total_time,information_table=f"{len(rows)} rows updated",contact_table=f"{len(rows)} rows updated",location_table=f"{len(rows)} updated",car_table=f"{len(rows)} rows updated",finance_table=f"{len(rows)} rows updated")
+    
+    except Exception as e:
+        status_data_logger.error(f"{str(e)}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"{str(e)}")
     
 
-
-@dedupe_routes.post("/insert_enriched_data",status_code=status.HTTP_200_OK)
+@dedupe_routes.post("/insert_enriched_data",status_code=status.HTTP_200_OK,response_model=InsertEnrichedDataResponse)
 
 async def insert_enriched_data(filename:str=Query(...,description="Provide the name for excel filename with status data")):
     try:
@@ -481,6 +692,7 @@ async def insert_enriched_data(filename:str=Query(...,description="Provide the n
         rows_list=[]
 
         for e in enriched_data:
+
             Title=e[0]
             forename=e[1]
             lastname=e[2]
@@ -530,22 +742,71 @@ async def insert_enriched_data(filename:str=Query(...,description="Provide the n
             year = e[45]
             birth_date = e[3]
 
-            
-        new_convert = EnrichedData(Title=Title, forename=forename, lastname=lastname, IDNo=IDNo,Race=Race,gender=gender, Marital_Status=marital_status, line1=line1,line2=line2,line3=line3, line4=line4, PCode=PCode, Province=Province,Home_number=Home_Number, Work_number=Work_Number,mobile_Number=mobile_Number, mobile_Number2=mobile_Number2,mobile_Number3=mobile_Number3, mobile_Number4=mobile_Number4,mobile_Number5=mobile_Number5, mobile_Number6=mobile_Number6,derived_income=derived_income, cipro_reg=cipro_reg,Deed_office_reg=Deed_office_reg, vehicle_owner=vehicle_owner,cr_score_tu=cr_score_tu, monthly_expenditure=monthly_expenditure,owns_cr_card=owns_cr_card, cr_card_rem_bal=cr_card_rem_bal,owns_st_card=owns_st_card, st_card_rem_bal=st_card_rem_bal,has_loan_acc=has_loan_acc, loan_acc_rem_bal=loan_acc_rem_bal,has_st_loan=has_st_loan, st_loan_bal=st_loan_bal,has_1mth_loan=has_1mth_loan, onemth_loan_bal=onemth_loan_bal,sti_insurance=sti_insurance, has_sequestration=has_sequestration,has_admin_order=has_admin_order, under_debt_review=under_debt_review,deceased_status=deceased_status, has_judgements=has_judgements,make=make,model=model, year=year, birth_date = birth_date)
+            new_convert = EnrichedData(Title=Title, forename=forename, lastname=lastname, IDNo=IDNo,Race=Race,gender=gender, Marital_Status=marital_status, line1=line1,line2=line2,line3=line3, line4=line4, PCode=PCode, Province=Province,Home_number=Home_Number, Work_number=Work_Number,mobile_Number=mobile_Number, mobile_Number2=mobile_Number2,mobile_Number3=mobile_Number3, mobile_Number4=mobile_Number4,mobile_Number5=mobile_Number5, mobile_Number6=mobile_Number6,derived_income=derived_income, cipro_reg=cipro_reg,Deed_office_reg=Deed_office_reg, vehicle_owner=vehicle_owner,cr_score_tu=cr_score_tu, monthly_expenditure=monthly_expenditure,owns_cr_card=owns_cr_card, cr_card_rem_bal=cr_card_rem_bal,owns_st_card=owns_st_card, st_card_rem_bal=st_card_rem_bal,has_loan_acc=has_loan_acc, loan_acc_rem_bal=loan_acc_rem_bal,has_st_loan=has_st_loan, st_loan_bal=st_loan_bal,has_1mth_loan=has_1mth_loan, onemth_loan_bal=onemth_loan_bal,sti_insurance=sti_insurance, has_sequestration=has_sequestration,has_admin_order=has_admin_order, under_debt_review=under_debt_review,deceased_status=deceased_status, has_judgements=has_judgements,make=make,model=model, year=year, birth_date = birth_date)
 
-
-        rows_list.append(new_convert.model_dump())
+            rows_list.append(new_convert.model_dump())
         
 
-        insertion_time=time.time()
-                          
-        return True
+        insertion_time1=time.time()
+
+        for i in range(5):
+
+            if i==1:
+                insert_list=get_status_tuple(rows_list,i)
+                if insert_list==False:
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"an internal server error occurred while generating a list for the finance table")
+                response=insert_data_into_finance_table(insert_list)
+                if response==False:
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"An internal server error occurred while inserting data into the finance table")
+            elif i==2:
+                insert_list=get_status_tuple(rows_list,i)
+                if insert_list==False:
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail="An internal server error occurred while generating a list for location table")
+                response=insert_data_into_location_table(insert_list)
+                if response==False:
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail="An internal server error occurred while inserting data on the location table")
+            elif i==3:
+                insert_list=get_status_tuple(rows_list,i)
+                if insert_list==False:
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail="An internal server error occurred while generating a list for the contact table")
+                response=insert_data_into_contact_table(rows_list)
+                if response==False:
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail="An internal server error occurred while inserting a list on the contact table")
+            elif i==4:
+                insert_list=get_status_tuple(rows_list,i)
+                if insert_list==False:
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail="An internal server error occurred while generating a list for the employment table")
+                response=insert_data_into_employment_table(rows_list)
+                if response==False:
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail="An internal server error occurred while insrting to the employment table")
+            elif i==5:
+                insert_list=get_status_tuple(rows_list,i)
+                if insert_list==False:
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail="An internal server error occurred while generating a list for the car table")
+                response=insert_data_into_car_table(insert_list)
+
+                if response==False:
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail="An internal server error occurred while inserting to the car table")
+            else:
+                insert_list=get_status_tuple(rows_list,i)
+
+                if insert_list==False:
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail="An internal server error occurred while generating a list for the finance table")
+                response=insert_data_into_finance_table(insert_list)
+                if response==False:
+                    raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail="An internal server error occurred while inserting data into the finance table")
+                
+        insertion_time2=time.time()
+        
+        total_insertion_time=insertion_time2 - insertion_time1
+
+        return InsertEnrichedDataResponse(number_of_leads=total_leads,status=True,data_extraction_time=total_data_extraction_time,data_insertion_time=total_insertion_time,contact_table=f"Contact table updated with:{len(enriched_data)} records",location_table=f"location table updated with:{len(enriched_data)} records",car_table=f"car table updated with:{len(enriched_data)} records",finance_table=f"finance table updated with:{len(enriched_data)} recorda")
     except Exception as e:
         #you need log here
-
+        status_data_logger.error(f"{str(e)}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"{str(e)}")
 
-@dedupe_routes.post("/add_manual_dedupe_list2")
+@dedupe_routes.post("/add_manual_dedupe_list2",status_code=status.HTTP_201_CREATED)
 
 async def add_manual_dedupe_list2(filename:Annotated[UploadFile,File()],camp_code:str=Query(description="Vicidial Campaign Code"),session:Session=Depends(get_session)):
    
@@ -583,37 +844,82 @@ async def add_manual_dedupe_list2(filename:Annotated[UploadFile,File()],camp_cod
 
         data=[(r[0],r[1],camp_code,'P',key) for r in rows]
 
-        dedupe_models=[]
+        #dedupe_models=[]
 
-        for item in data:
-            model_instance=Campaign_Dedupes(id=item[0],cell_number=item[1],campaign_name=item[2],status=item[3],code=item[4])
-            dedupe_models.append(model_instance)
+        campaigns=[Campaign_Dedupe(id=id,cell=cell,campaign_name=camp_code,status=status,key=key) for id,cell,camp_code,status,key in data]
+
+        try:
+            session.add_all(campaigns)
+            session.commit()
+            session.close()
+            dedupe_logger.info(f"inserted {len(campaigns)} records into the campaign dedupe table")
+
+        except Exception as e:
+            session.rollback()
+            session.close()
+            dedupe_logger.exception(f"An exception occurred while:{e}")
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"An exception occurred while inserting data in the campaign dedupe table")
+
+
+
+        # for item in data:
+        #     model_instance=Campaign_Dedupe(id=item[0],cell_number=item[1],campaign_name=item[2],status=item[3],code=item[4])
+        #     dedupe_models.append(model_instance)
         
         dedupe_logger.info("connecting to the database for manual dedupe upload")
        
         update_data=[(r[1],'DEDUPE') for r in rows]
 
-        upsert_data:List=[{"cell_number":item[0],"extra_info":item[1]} for item in update_data]
-
-        insert_statement=insert(information_table).values(upsert_data)
-
-        #potential hazards
-        upsert_statement=insert_statement.on_conflict_do_update(index_elements=['cell_number'],set={"extra_info":insert_statement.excluded.extra_info})
+        query="""
+                INSERT INTO info_tbl(cell,extra_info)
+                VALUES(:cell,:extra_info)
+                ON CONFLICT(cell)
+                DO UPDATE SET extra_info=EXCLUDED.extra_info
+                WHERE info_tbl.cell = EXCLUDED.cell
+             """
         
         try:
-            session.add_all(dedupe_models)
-            dedupe_logger.info(f"dedupe batches successfully added:{len(dedupe_models)}")
-            session.exec(upsert_statement)
-            session.commit()
-            dedupe_logger.info("Successfully updated number and extra information cell")
+            # insert and perform update 
+            with engine.begin() as conn:
+                conn.execute(text(query),[{"cell":cell,"extra_info":info} for cell,info in update_data])
+                conn.close()
+
+            dedupe_logger.info(f"inserted records of length:{len(update_data)} on the info_tbl(information table)")
+
         except Exception as e:
-            dedupe_logger.error(e)
-            session.rollback()
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"error occuured while processing the data")
+            conn.rollback()
+            dedupe_logger.exception(f"an exception occurred while updating info_tbl with:{len(update_data)} data:{e}")
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"an internal server error occurred while inserting data into the info_tbl")
         
-        return ManualDedupeListReturn(Success=True,Key=key)
+        
+        # with engine.begin() as conn:
+
+        #     conn.execute(text(query),[{"cell":cell,"extra_info":info} for cell,info in update_data])
+
+
+        # upsert_data=[{"cell":item[0],"extra_info":item[1]} for item in update_data]
+
+        # insert_statement=insert(info_tbl).values(upsert_data)
+
+        # #potential hazards
+        # upsert_statement=insert_statement.on_conflict_do_update(index_elements=['cell'],set={"extra_info":insert_statement.excluded.extra_info})
+        
+        # try:
+        #     session.add_all(dedupe_models)
+        #     dedupe_logger.info(f"dedupe batches successfully added:{len(dedupe_models)}")
+        #     session.exec(upsert_statement)
+        #     session.commit()
+        #     dedupe_logger.info("Successfully updated number and extra information cell")
+        # except Exception as e:
+        #     dedupe_logger.error(e)
+        #     session.rollback()
+        #     raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"error occuured while processing the data")
+        
+        return ManualDedupeListReturn(Success=True,Information_Table=f"{len(update_data)} records updated on the information table",Campaign_Dedupe_Table=f"{len(campaigns)} inserted on the campaign dedupe table",Key=key)
        
+
     except Exception as e:
         dedupe_logger.critical(e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail="An internal server error")
     
+

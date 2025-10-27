@@ -23,12 +23,6 @@ class info_tbl(SQLModel,table=True):
     created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
 
 
-class rule_tables(SQLModel,table=True):
-    rule_id:Optional[int]=Field(primary_key=True,default=None,nullable=False)
-    rule_code:str=Field(default=None,nullable=False)
-    rule_name:str=Field(default=None,nullable=False)
-    created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
-
 class lead_history_tbl(SQLModel,table=True):
     #serial primary key, increment
     lead_pk:Optional[int]=Field(primary_key=True,default=None,nullable=False)
@@ -44,31 +38,24 @@ class lead_history_tbl(SQLModel,table=True):
     #rule code is on the table, pay attention to it
 
 
-class car_table(SQLModel,table=True):
-    
-    id:Optional[int]=Field(primary_key=True,default=None,nullable=False)
-    #foreign key
-    cell_number:str=Field(default=None,nullable=False)
+class car_tbl(SQLModel,table=True):
+    cell_number:str=Field(primary_key=True,default=None,nullable=False)
     make:str=Field(default=None,nullable=False)
     model:str=Field(default=None,nullable=False)
     year:str=Field(default=None,nullable=False)
     created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
 
 
-class employment_table(SQLModel,table=True):
-    id:Optional[int]=Field(primary_key=True,default=None,nullable=False)
-    #foreign key
-    cell_number:Optional[str]=Field(default=None,nullable=False)
+class employment_tbl(SQLModel,table=True):
+    cell:Optional[str]=Field(primary_key=True,default=None,nullable=False)
     job:str=Field(nullable=False,default=None)
     occupation:str=Field(default=None,nullable=False)
     campany:str=Field(default=None,nullable=False)
-    created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
+    #created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
 
 
-class location_table(SQLModel,table=True):
-    id:Optional[int]=Field(primary_key=True,default=None,nullable=False)
-    #foreign key
-    cell_number:str=Field(default=None,nullable=False)
+class location_tbl(SQLModel,table=True):
+    cell:str=Field(primary_key=True,default=None,nullable=False)
     line_one:str=Field(default=None,nullable=False)
     line_two:str=Field(default=None,nullable=False)
     line_three:str=Field(default=None,nullable=False)
@@ -77,13 +64,10 @@ class location_table(SQLModel,table=True):
     province:str=Field(default=None,nullable=False)
     surburb:str=Field(default=None,nullable=False)
     city:str=Field(default=None,nullable=False)
-    created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
 
 
-class finance_table(SQLModel,table=True):
-    id:Optional[int]=Field(primary_key=True,default=None,nullable=False)
-    #foreign key
-    cell_number:str=Field(nullable=False,default=None)
+class finance_tbl(SQLModel,table=True):
+    cell:str=Field(primary_key=True,nullable=False,default=None)
     cipro_reg:bool=Field(nullable=False,default=None)
     deed_office_reg:bool=Field(nullable=False,default=None)
     vehicle_owner:bool=Field(nullable=False,default=None)
@@ -106,19 +90,16 @@ class finance_table(SQLModel,table=True):
     has_judgements:bool=Field(nullable=False,default=None)
     bank:str=Field(nullable=False,default=None)
     bal:float=Field(nullable=False,default=None)
-    created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
+
+    #created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
 
 
-class contact_table(SQLModel,table=True):
-    id:Optional[int]=Field(primary_key=True,nullable=False,default=None)
-    #foreign key
-    cell_number:Optional[str]=Field(nullable=False,default=None)
+class contact_tbl(SQLModel,table=True):
+    cell:Optional[str]=Field(primary_key=True,nullable=False,default=None)
     home_number:str=Field(nullable=True,default=None)
     work_number:str=Field(nullable=True,default=None)
     mobile_number_one:str=Field(nullable=True,default=None)
     mobile_number_two:str=Field(nullable=True,default=None)
     mobile_number_three:str=Field(nullable=True,default=None)
     email:str=Field(nullable=True,default=None)
-    created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
-
-
+    

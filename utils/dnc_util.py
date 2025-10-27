@@ -68,7 +68,6 @@ def send_dnc_list_to_db(dnc_list:list,camp_code:str):
         dnc_logger.info(f"{len(dnc_list)} numbers added to the dnc database(db)")
 
     except mysql.connector.Error as e:
-
         dnc_logger.error(f"{str(e)}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"error connecting to the dnc mysql db")
     

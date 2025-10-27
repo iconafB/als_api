@@ -5,12 +5,11 @@ from routers.campaigns import campaigns_router
 from routers.dnc_routes import dnc_router
 from routers.dedupes import dedupe_routes
 from routers.campaign_rules import campaign_rule_router
-from routers.load_als_routes import load_als_router
 from routers.black_list import black_router
 from routers.pings import ping_router
 from routers.leads_route import leads_router
 from database.database import create_db_and_tables
-
+from routers.leads_route import leads_router
 #from database.database import create_db_and_tables
 
 
@@ -45,7 +44,6 @@ app.include_router(dnc_router)
 app.include_router(dedupe_routes)
 app.include_router(campaign_rule_router)
 #this should go baba loading should be automatic
-app.include_router(load_als_router)
 app.include_router(black_router)
 app.include_router(ping_router)
 app.include_router(leads_router)

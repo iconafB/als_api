@@ -15,6 +15,7 @@ auth_logger=define_logger("als auth logger","logs/auth_route.log")
 auth_router=APIRouter(tags=["Authentication"],prefix="/auth")
 # register response model after database integration
 @auth_router.post("/register",status_code=status.HTTP_201_CREATED,response_model=RegisterUserResponse,description="Register user to the als by providing email,password, and full name")
+
 async def register_user(user:RegisterUser,session:Session=Depends(get_session)):
     #verify if the user exist
     user_exists=session.exec(select(users_table).where(users_table.email==user.email)).first()

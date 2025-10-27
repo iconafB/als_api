@@ -32,7 +32,7 @@ class dma_records_table(SQLModel,table=True):
 #need to know when do we first use this table
 #have an that is a primary key and of serial type
 
-#The branc code and camapign code can also go to the list tracker table and be removed from this table
+#The branch code and camapign code can also go to the list tracker table and be removed from this table
 class dma_validation_data(SQLModel,table=True):
     id:str=Field(primary_key=True,nullable=False,default=None)
     fore_name:str=Field(nullable=False,default=None)

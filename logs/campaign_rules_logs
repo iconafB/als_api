@@ -1,0 +1,31 @@
+2025-10-22 15:36:59,043 - als campaign rules - ERROR - 'rule name/campaign code:RULE_ONE already exists' is not a valid HTTPStatus
+2025-10-22 15:37:20,695 - als campaign rules - ERROR - 'rule name/campaign code:RULE_ONE already exists' is not a valid HTTPStatus
+2025-10-22 15:38:10,905 - als campaign rules - ERROR - 'rule name/campaign code:RULE_ONE already exists' is not a valid HTTPStatus
+2025-10-22 15:40:12,805 - als campaign rules - ERROR - 'rule name/campaign code:DGRTEHGD already exists' is not a valid HTTPStatus
+2025-10-22 15:41:38,252 - als campaign rules - ERROR - 'rule name/campaign code:DGRTEHGD already exists' is not a valid HTTPStatus
+2025-10-22 15:47:10,121 - als campaign rules - ERROR - 'rule name/campaign code:DGRTEHGD already exists' is not a valid HTTPStatus
+2025-10-22 15:48:22,263 - als campaign rules - ERROR - 'rule name/campaign code:DGRTEHGD already exists' is not a valid HTTPStatus
+2025-10-22 15:49:36,674 - als campaign rules - ERROR - 'rule name/campaign code:DGRTEHGD already exists' is not a valid HTTPStatus
+2025-10-22 15:50:23,956 - als campaign rules - ERROR - 'rule name/campaign code:DGRTEHGD already exists' is not a valid HTTPStatus
+2025-10-22 15:52:30,928 - als campaign rules - ERROR - 400: rule name/campaign code:DGRTEHGD already exists
+2025-10-22 15:53:12,460 - als campaign rules - ERROR - 400: rule name/campaign code:DGRTEHGD already exists
+2025-10-22 15:54:37,959 - als campaign rules - ERROR - 400: rule name/campaign code:DGRTEHGD already exists
+2025-10-22 15:55:38,946 - als campaign rules - ERROR - 400: rule name/campaign code:DGRTEHGD already exists
+2025-10-22 16:01:16,244 - als campaign rules - ERROR - 400: rule name/campaign code:DGRTEHGD already exists
+2025-10-22 16:02:32,428 - als campaign rules - ERROR - 400: rule name/campaign code:DGRTEHGD already exists
+2025-10-22 16:03:55,703 - als campaign rules - ERROR - 400: rule name/campaign code:DGRTEHGD already exists
+2025-10-22 16:05:25,378 - als campaign rules - ERROR - 400: rule_name:DGRTEHGD already exists
+2025-10-22 16:07:05,321 - als campaign rules - ERROR - 400: rule_name:DGRTEHGD already exists
+2025-10-22 16:08:21,842 - als campaign rules - ERROR - 400: rule_name:DGRTEHGD already exists
+2025-10-22 16:09:27,888 - als campaign rules - ERROR - 400: rule_name:DGRTEHGD already exists
+2025-10-22 16:27:51,853 - als campaign rules - ERROR - 400: rule_name:DGRTEHGD already exists
+2025-10-22 16:28:50,245 - als campaign rules - ERROR - 400: rule_name:DGRTEHGD already exists
+2025-10-22 16:30:32,255 - als campaign rules - ERROR - 400: rule_name:DGRTEHGD already exists
+2025-10-22 16:35:13,871 - als campaign rules - ERROR - 400: rule_name:DGRTEHGD already exists
+2025-10-22 16:35:48,313 - als campaign rules - ERROR - 400: rule_name:DGRTEHGD already exists
+2025-10-22 16:42:42,004 - als campaign rules - ERROR - 400: rule_name:DGRTEHGD already exists
+2025-10-22 16:47:22,802 - als campaign rules - ERROR - 400: rule_name:GIANTS already exists
+2025-10-22 16:53:59,773 - als campaign rules - ERROR - 400: rule_name:UNGGDFZ already exists
+2025-10-22 16:56:36,936 - als campaign rules - ERROR - 400: start year cannot be greater than the end year
+2025-10-22 16:56:51,442 - als campaign rules - INFO - campaign created:UNGGDFA
+2025-10-22 16:59:00,165 - als campaign rules - INFO - campaign rule created:UNGGDFe

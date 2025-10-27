@@ -15,14 +15,13 @@ class campaign_tbl(SQLModel,table=True):
     
 #leads that have been deduped under a specific campaign
 #added a code field on campaign_dedupe table
-class Campaign_Dedupes(SQLModel,table=True):
-    id:Optional[int]=Field(nullable=False,default=None,primary_key=True)
-    cell_number:str=Field(default=None,nullable=False)
-    id_number:str=Field(default=None,nullable=False)
+class Campaign_Dedupe(SQLModel,table=True):
+    lead_pk:Optional[int]=Field(nullable=False,default=None,primary_key=True)
+    cell:str=Field(default=None,nullable=False)
+    id:str=Field(default=None,nullable=False)
     campaign_name:str=Field(default=None,nullable=False)
     status:str=Field(default=None,nullable=False)
     code:str=Field(default=None,nullable=False)
-    created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
 
 #store the tokens on the dotenv file
 # add a column on campaigns table to specify whether the campaign is a dedupe campaign or not
@@ -38,7 +37,6 @@ class Rule(SQLModel):
 
 
 class Deduped_Campaigns(SQLModel,table=True):
-
     id:Optional[int]=Field(primary_key=True,nullable=False,default=None)
     branch:str=Field(nullable=False,default=None)
     camp_name:str=Field(nullable=False,default=None)
@@ -53,4 +51,12 @@ class campaign_rules_tbl(SQLModel,table=True):
     rule_code:str=Field(nullable=False,default=None)
     date_rule_created:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
     is_active:bool=Field(nullable=False,default=None)
+
+class dedupe_campaigns_tbl(SQLModel,table=True):
+    id:Optional[int]=Field(primary_key=True,nullable=False,default=None)
+    branch:str=Field(nullable=False,default=None)
+    campaign_name:str=Field(nullable=False,default=None,index=True)
+    camp_code:str=Field(nullable=False,default=None,index=True)
+    is_active:str=Field(nullable=False,default=True)
+    cerated_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
 

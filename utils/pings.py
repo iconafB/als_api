@@ -151,3 +151,5 @@ def classify_model_type(session:Session=Depends(get_pings_session_db)):
         session.close()
         pings_logger.critical(f"{str(e)}")
         return {"error_message":f"{str(e)}"}
+    
+

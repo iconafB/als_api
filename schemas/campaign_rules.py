@@ -2,14 +2,16 @@ from pydantic import BaseModel,Field
 from typing import Optional
 
 class CreateCampaignRule(BaseModel):
-    campaign_code:str=Field(default=None,min_length=2,max_length=15)
-    minimum_salary:Optional[int]=None
-    start_year:int
-    end_year:int
+    rule_name:str=Field(default=None,min_length=2,max_length=15)
+    salary:Optional[int]=None
+    gender:str
+    birth_year_start:int
+    birth_year_end:int
     limit:int
     typedata:str=Field(default="Status",min_length=1,max_length=20)
     last_used:int
     rule_location:str
+
 
 class RuleSQLColumn(BaseModel):
     salary:Optional[int]=None
