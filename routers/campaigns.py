@@ -5,18 +5,21 @@ from sqlalchemy.sql import func
 import sqlalchemy as sa
 from datetime import datetime,timedelta
 from models.campaigns import campaign_tbl
-from models.leads import info_tbl
+from models.information_table import info_tbl
 from models.dma_service import dma_audit_id_table,list_tracker_table
 from models.campaign_rules import rules_tbl
 from models.dma_service import dma_validation_data
 from schemas.campaigns import CreateCampaign,LoadCampaignResponse,LoadCampaign
 from database.database import get_session
+from database.master_db_connect import get_async_session
 #from utils.load_als_service import get_loader_als_loader_service
 from utils.dnc_util import dnc_list_numbers
 from utils.list_names import get_list_names
 from utils.auth import get_current_active_user
 from utils.logger import define_logger
 from utils.dmasa_service import DMA_Class,get_dmasa_service
+from utils.campaigns import build_dynamic_query
+from crud.campaigns import (create_campaign,get_all_campaigns_by_branch,get_campaign_by_code,get_campaign_by_name,update_campaign_name)
 from settings.Settings import get_settings
 
 campaigns_logger=define_logger("als campaign logs","logs/campaigns_route.log")
@@ -24,7 +27,8 @@ campaigns_logger=define_logger("als campaign logs","logs/campaigns_route.log")
 campaigns_router=APIRouter(tags=["Campaigns"],prefix="/campaigns")
 
 @campaigns_router.post("/create-campaign",status_code=status.HTTP_201_CREATED,description="Create a new campaign by providing a branch, campaign code and campaign name",response_model=campaign_tbl)
-async def create_campaign(campaign:CreateCampaign,session:Session=Depends(get_session),user=Depends(get_current_active_user)):
+
+async def create_campaign(campaign:CreateCampaign,session:Session=Depends(get_async_session),user=Depends(get_current_active_user)):
     
     try:
         #search the database for a campaign,hopefully the db is indexed
@@ -37,9 +41,9 @@ async def create_campaign(campaign:CreateCampaign,session:Session=Depends(get_se
         payload=campaign.model_dump()
         new_campaign=campaign_tbl.model_validate(payload)
         session.add(new_campaign)
-        session.commit()
-        session.refresh(new_campaign)
-        campaigns_logger.info(f"campaign:{campaign.campaign_name} with campaign code:{campaign.camp_code} created successfully by user with user_id:{user.id} and email:{user.email}")
+        await session.commit()
+        await session.refresh(new_campaign)
+        campaigns_logger.info(f"campaign:{campaign.camp_name} with campaign code:{campaign.camp_code} created successfully by user with user_id:{user.id} and email:{user.email}")
         
         return new_campaign
     except Exception as e:
@@ -53,7 +57,7 @@ async def create_campaign(campaign:CreateCampaign,session:Session=Depends(get_se
 #load campaign to a specific branch
 #load numbers from the global dnc or king price dnc 
 
-async def load_campaign(load_campaign:LoadCampaign,camp_code:str=Path(...,description="Please provide the campaign code"),session:Session=Depends(get_session),user=Depends(get_current_active_user),background:BackgroundTasks=BackgroundTasks,dma_object:DMA_Class=Depends(get_dmasa_service)):
+async def load_campaign(load_campaign:LoadCampaign,session:Session=Depends(get_session),user=Depends(get_current_active_user),background:BackgroundTasks=BackgroundTasks,dma_object:DMA_Class=Depends(get_dmasa_service)):
     #calculate the number of entries in table campaign_rules
     try:
         #check if the campaign exist before trying to load it
@@ -63,17 +67,17 @@ async def load_campaign(load_campaign:LoadCampaign,camp_code:str=Path(...,descri
 
         #if the campaign does not exist notify the use
         if not campaign:
-            campaigns_logger.info(f"campaign:{camp_code} does not exist")
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"campaign:{camp_code} does not exist")
+            campaigns_logger.info(f"campaign:{load_campaign.camp_code} does not exist,loading requested by {user.id} with email:{user.email}")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"campaign:{load_campaign.camp_code} does not exist")
         
         # search the rules_table
-        rule_query=select(rules_tbl).where(rules_tbl.rule_name==camp_code)
+        rule_query=select(rules_tbl).where(rules_tbl.rule_name==load_campaign.camp_code)
         #execute the query
         first_rule=session.exec(rule_query).first()
 
         if not first_rule:
             campaigns_logger.info(f"user:{user.id} with email:{user.email} requested a rule that does not exist")
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"no rule exist for campaign:{camp_code}")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"no rule exist for campaign:{load_campaign.camp_code}")
         
         #last used
         today=datetime.now()
@@ -82,60 +86,44 @@ async def load_campaign(load_campaign:LoadCampaign,camp_code:str=Path(...,descri
 
         thirsty_days_ago_start=thirsty_days_ago.replace(hour=0,minute=0,second=0,microsecond=0)
 
-        thirsty_days_ago_end=thirsty_days_ago_start + timedelta(days=1)
+        #thirsty_days_ago_end=thirsty_days_ago_start + timedelta(days=1)
 
         #years filters
-        start_year=first_rule.rule_sql['start_year']
+        #start_year=first_rule.rule_sql['start_year']
 
-        end_year=first_rule.rule_sql['end_year']
+        #end_year=first_rule.rule_sql['end_year']
+
         # calculate two-digit year range
 
-        start_two_digit=start_year % 100 # 1980->80 or 2000->00
+        #start_two_digit=start_year % 100 # 1980->80 or 2000->00
 
-        end_year_two_digit=end_year % 100 #1995->95 or 2010->10
+        #end_year_two_digit=end_year % 100 #1995->95 or 2010->10
         #the current year shoulde a dynamic value
-        current_year=2025
+        #current_year=2025
 
-        century_cutoff=current_year % 100
+        #century_cutoff=current_year % 100
        
-        info_tbl_query=select(info_tbl.id,info_tbl.fore_name,info_tbl.last_name,info_tbl.cell).where((info_tbl.salary>=first_rule.rule_sql["salary"]) | (info_tbl.salary == None)).where(info_tbl.type_data=="Status").where(func.cast(func.cast(info_tbl.id,1,2),Integer).between(min(start_two_digit,end_year_two_digit),max(start_two_digit,end_year_two_digit))).where((func.cast(func.substr(info_tbl.id,1,2),Integer)+1900).between(start_year,end_year) & (func.cast(func.substr(info_tbl.id,1,2),Integer)>century_cutoff)).where((info_tbl.last_used==None) | ((info_tbl.last_used>=thirsty_days_ago_start) & (info_tbl.last_used<thirsty_days_ago_end))).order_by(func.random()).limit(first_rule.rule_sql["limit"])
-        #execute the big query
-        leads_all=session.exec(info_tbl_query).all()
+        #info_tbl_query=select(info_tbl.id,info_tbl.fore_name,info_tbl.last_name,info_tbl.cell).where((info_tbl.salary>=first_rule.rule_sql["salary"]) | (info_tbl.salary == None)).where(info_tbl.type_data=="Status").where(func.cast(func.cast(info_tbl.id,1,2),Integer).between(min(start_two_digit,end_year_two_digit),max(start_two_digit,end_year_two_digit))).where((func.cast(func.substr(info_tbl.id,1,2),Integer)+1900).between(start_year,end_year) & (func.cast(func.substr(info_tbl.id,1,2),Integer)>century_cutoff)).where((info_tbl.last_used==None) | ((info_tbl.last_used>=thirsty_days_ago_start) & (info_tbl.last_used<thirsty_days_ago_end))).order_by(func.random()).limit(first_rule.rule_sql["limit"])
+        
+        query,params=build_dynamic_query(load_campaign.camp_code)
 
+        rows=await session.execute(query,params).mappings().all()
+
+        #execute the big query
+        leads_all=[dict(row) for row in rows]
+        
         if len(leads_all)<=0:
             campaigns_logger.info(f"no leads can be loaded for campaign:{load_campaign.camp_code} in branch:{load_campaign.branch}")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"no leads can be loaded for this campaign")
         
         #SELECT id, fore_name, last_name, cell FROM info_tbl WHERE (salary>=16000 or salary is null) and (typedata = "Status") and (last_used is null or (DATE_PART("day",now()::timestamp - last_used::timestamp) > 29)) and (CAST(SUBSTRING(id,1,2) AS INTEGER) <=98 and CAST(SUBSTRING(id,1,2) AS INTEGER) >=68) order by random() limit 3000
         #salary condition
-        salary_condition="(salary>=:min_salary OR salary is NULL)"
-
-        raw_sql_query=text(f""" select id,fore_name,last_name,cell from info_tbl where {salary_condition} AND (typedata:=status_val) AND (last_used IS NULL OR (DATE_PART('day',NOW()::timestamp - last_used::timestamp)>29)) AND (CAST(SUBSTRING(id,1,2) AS INTEGER)<=:max_id AND CAST(SUBSTRING(id,1,2) AS INTEGER)>=:min_id) ORDER BY random() LIMIT :row_limit""")
-       
-        if load_campaign.max_salary is not None:
-            params["max_sal"]=load_campaign.max_salary
-        
-        params={
-            "min_sal":load_campaign.min_salary,
-            "status_val":"Status",
-            "min_id":load_campaign.min_dob_year,
-            "max_id":load_campaign.max_dob_year,
-            "row_limit":load_campaign.limit
-        }
-
-
-        if load_campaign.max_salary is not None:
-            salary_condition=f"({salary_condition} AND salary<=:max_sal)"
-
-        #execute the query
-
-        leads_results=session.exec(raw_sql_query.params(**params)).all()
 
         fetched_rows=len(leads_all)
+        
         #needs attention
         if leads_all==0 and fetched_rows==0:
             campaigns_logger.info(f"No leads found for campaign:{load_campaign.camp_code}")
-
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"No leads exist for campaign:{camp_code}")
 
         #rule code and rule sql needs to be addressed
@@ -149,8 +137,7 @@ async def load_campaign(load_campaign:LoadCampaign,camp_code:str=Path(...,descri
             # for idx, obj in enumerate(leads_results):
             #     if obj[3] in dnc_list:
             #         leads_results.pop(idx)
-
-                
+            
             #filter the numbers on the dnc list
            
             filtered_results = [obj for obj in leads_all if obj[3] not in dnc_list]
@@ -162,7 +149,7 @@ async def load_campaign(load_campaign:LoadCampaign,camp_code:str=Path(...,descri
 
             todays_date=datetime.today().strftime('%Y-%m-%d')
             
-            list_name=get_list_names(camp_code)
+            list_name=get_list_names(load_campaign.camp_code)
 
             if list_name==None:
 
@@ -229,8 +216,7 @@ async def load_campaign(load_campaign:LoadCampaign,camp_code:str=Path(...,descri
             session.close()
             campaigns_logger.info(f"list name:{list_name} successfully inserted on the track table with audit id:{audit_id} for campaign code:{load_campaign.camp_code} from branch:{load_campaign.branch} on this day:{todays_date}")
 
-
-        return LoadCampaignResponse(campaign_code=camp_code,branch=load_campaign.branch,list_name=list_name,audit_id=submit_dma_data.json()['DedupeAuditId'],records_processed=submit_dma_data.json()['RecordsProcessed'],dma_status_code=submit_dma_data.status_code,load_dmasa_status=load_dmasa_status,number_of_leads_submitted=leads_length)
+        return LoadCampaignResponse(campaign_code=load_campaign.camp_code,branch=load_campaign.branch,list_name=list_name,audit_id=submit_dma_data.json()['DedupeAuditId'],records_processed=submit_dma_data.json()['RecordsProcessed'],dma_status_code=submit_dma_data.status_code,load_dmasa_status=load_dmasa_status,number_of_leads_submitted=leads_length)
 
             
 
@@ -277,6 +263,8 @@ async def load_campaign(load_campaign:LoadCampaign,camp_code:str=Path(...,descri
             
         #     return {"campaign code":camp_code,"branch":load_campaign.branch,"list name":list_name,"load dmasa status":load_dmasa_status,"dma_service_status_code":dma_response.status_code}
         
+    
+    
     except Exception as e:
         print(str(e))
         campaigns_logger.critical(f"{str(e)}")
@@ -302,14 +290,13 @@ async def get_campaign_by_code(camp_code:str,session:Session=Depends(get_session
 @campaigns_router.patch("/{camp_code}",status_code=status.HTTP_200_OK,description="Update the campaign name,campaign code or move it to another branch")
 async def update_campaign_name(camp_code:str,campaign_name:str=Query(...,description="New campaign name to update the old name"),session:Session=Depends(get_session),user=Depends(get_current_active_user)):
     try:
-        campaign_name_query=select(campaign_tbl.campaign_name).where(campaign_tbl.camp_code==camp_code)
-        campaign_name=session.exec(campaign_name_query).first()
-        if not campaign_name:
+        campaign=await get_campaign_by_code(session,camp_code)
+        if not campaign:
             campaigns_logger.info(f"campaign with campaign code:{camp_code} does not exist")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"campaign with campaign code:{camp_code} does not exist")
-        
+        return await update_campaign_name(campaign.campaign_name,session)
+    
     except Exception as e:
         campaigns_logger.exception(f"an exception occurred while updating campaign campaign name:{str(e)}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"An internal server error occurred while updating:{campaign_name}")
     
-

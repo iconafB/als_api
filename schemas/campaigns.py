@@ -7,7 +7,6 @@ class CreateCampaign(SQLModel):
     camp_code:str=Field(min_length=1,max_length=100)
     campaign_name:str=Field(min_length=1,max_length=100)
 
-
 class CreateCampaignResponse(SQLModel):
     id:int
     camp_code:str=Field(min_length=1,max_length=100)

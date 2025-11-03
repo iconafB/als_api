@@ -1,7 +1,7 @@
 from sqlmodel import select,func
 from sqlalchemy import text
 from sqlmodel.ext.asyncio.session import AsyncSession
-from typing import List,Optional
+from typing import List,Optional,Sequence,Dict,Tuple
 from models.campaigns import dedupe_campaigns_tbl
 
 from schemas.dedupe_campaigns import CreateDedupeCampaign
@@ -408,3 +408,120 @@ async def bulk_update_campaign_dedupe(session:AsyncSession,db_list:List,status:s
                     """
                 )
     return True
+
+
+
+async def bulk_upsert_update_info_tbl_in_batches(session:AsyncSession,data:Sequence[Dict[str,str]],batch_size:int=1000):
+    
+    RAW_QUERY="""
+                INSERT INTO info_tbl(cell,extra_info)
+                VALUES(:cell,:extra_info)
+                ON CONFLICT(cell)
+                DO UPDATE SET extra_info=EXCLUDED.extra_info
+                WHERE info_tbl.cell = EXCLUDED.cell
+             """
+    total=len(data)
+    for i in range(0,total,batch_size):
+        batch=data[i:i + batch_size]
+        for record in batch:
+            await session.execute(RAW_QUERY,record)
+        await session.commit()
+
+    return 
+
+async def bulk_insert_campaign_dedupe_tbl_in_batches():
+    return True
+
+
+
+async def select_code_from_campaign_dedupe_table(session:AsyncSession,code:str)->str | None:
+
+    sql_query = text("SELECT code FROM campaign_dedupe WHERE code = :code")
+    result=await session.execute(sql_query,{"code":code})
+    row=result.fetchone()
+    return row[0] if row else None
+
+#campaigns rule where clause builder to query the campaigns correctly
+
+def build_where_clause(filters:dict)->Tuple[str,dict]:
+
+    DEDUPE_JOIN_CAMPAIGNS = {
+    "TEBBDY/TERDDY/TEUAPIDY/TLEBHQD/TLED3HQD/TLEAHQD",
+    "TEFWFDY/TLEFHQD"
+     }
+    conditions=[]
+
+    params={}
+    camp_code=filters.get('camp_code','')
+    
+    if any(group in camp_code for group in DEDUPE_JOIN_CAMPAIGNS):
+        group_name= next(g for g in DEDUPE_JOIN_CAMPAIGNS if g in camp_code)
+
+        where_clause = """
+            EXISTS (
+                SELECT 1 FROM campaign_dedupe cd 
+                WHERE cd.cell = i.cell 
+                  AND cd.status = 'R' 
+                  AND cd.campaign_name = :group_name
+            )
+            AND i.id IS NOT NULL
+        """
+        params={"group_name": group_name}
+
+        return where_clause,params
+    
+    #Salary or null
+    if filters.get('min_salary') is not None:
+        if filters.get('salary_or_NULL') is not None:
+            conditions.append("(salary>=:min_salary or salary IS NULL)")
+        else:
+            conditions.append("salary>=:salary")
+        params['min_salary']=filters['min_salary']
+    
+    # other filters, derived_income
+
+    if filters.get('min_derived_income') is not None:
+        conditions.append("derived_income>=:min_derived_income")
+        params['min_derived_income']=filters['min_derived_income']
+    # gender
+    if filters.get('gender') is not None:
+        conditions.append("gender=:gender")
+        params["gender"]=filters["gender"]
+
+    if filters.get('min_age') is not None or filters.get('max_age') is not None:
+        return True
+    
+    if filters.get('last_used') is not None:
+        conditions.append("""
+            (last_used IS NULL OR 
+             DATE_PART('day', NOW()::timestamp - last_used::timestamp) > :last_used_days)
+        """)
+        params['last_used']=filters['last_used']
+    
+    if filters.get('exclude_processed') is True:
+        conditions.append("extra_info IS NULL")
+    
+    #created at year
+
+    if filters.get('created_at_year') is not None:
+        conditions.append("DATE_PART('year', created_at) = :created_at_year")
+        params['created_at_year'] = filters['created_at_year']
+
+    if filters.get('require_id') is True:
+        conditions.append("i.id IS NOT NULL")
+
+    if filters.get('dedupe_join_required') is True:
+        conditions.append("""
+            EXISTS (
+                SELECT 1 FROM campaign_dedupe cd 
+                WHERE cd.cell = i.cell 
+                  AND cd.status = 'R' 
+                  AND cd.campaign_name = :camp_code
+            )
+        """)
+        params['camp_code'] = filters['camp_code']
+
+    where_sql = " AND ".join(conditions) if conditions else "TRUE"
+
+
+    return where_sql, params

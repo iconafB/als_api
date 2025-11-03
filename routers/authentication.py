@@ -43,7 +43,6 @@ async def register_user(user:RegisterUser,session:Session=Depends(get_session)):
     return new_user
 
 @auth_router.post("/login",status_code=status.HTTP_200_OK,response_model=Token,description="Login to the als by providing a password and email")
-
 async def login_user(user:Annotated[OAuth2PasswordRequestForm,Depends()],session:Session=Depends(get_session)):
     #index on email
     #find the user using the email 
@@ -97,4 +96,5 @@ async def forgot_password(data:ForgotPassword,session:Session=Depends(get_sessio
 
 @auth_router.get("/user",response_model=GetUserResponse)
 async def get_the_current_user(user=Depends(get_current_active_user)):
+
     return user

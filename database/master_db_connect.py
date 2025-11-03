@@ -15,7 +15,8 @@ ASYNC_MASTER_DB_URL=f"postgresql+asyncpg://{get_settings().master_db_user}:{get_
 #create the connection engine with the master db
 #master_db_engine=create_engine(MASTER_DB_URL,echo=True)
 
-master_async_engine=create_async_engine(ASYNC_MASTER_DB_URL,echo=True,future=True,pool_timeout=30,pool_recycle=1800,pool_size=10,max_overflow=20)
+master_async_engine=create_async_engine(ASYNC_MASTER_DB_URL,echo=True,future=True,pool_timeout=30,pool_recycle=1800,pool_size=10,max_overflow=20,echo=True)
+
 
 #session factory
 async_session_maker=async_sessionmaker(
@@ -26,7 +27,7 @@ async_session_maker=async_sessionmaker(
 
 #dependency injection
 async def get_async_session()->AsyncGenerator[AsyncSession,None]:
-    
+
     async with async_session_maker() as session:
         try:
             yield session #ensure session closes after session

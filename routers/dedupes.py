@@ -17,17 +17,22 @@ from datetime import datetime, timedelta
 from sqlmodel.ext.asyncio.session import AsyncSession
 from models.campaigns import Campaign_Dedupe,Deduped_Campaigns,dedupe_campaigns_tbl
 from models.campaign_rules import dedupe_campaign_rules_tbl
+
 from database.master_db_connect import get_async_session
 
 from crud.dedupe_campaign_rules import get_single_dedupe_campaign_rule_by_rule_name
 from crud.dedupe_campaigns import (get_deduped_campaign,get_leads_from_db_for_dedupe_campaign_for_TEBBDY_TERDDY,get_leads_from_db_for_dedupe_campaign_for_TEFWFDY_and_TLEFHQD,get_leads_for_DITFCS_DIFFWT_TELEFFWN,get_leads_for_campaigns_list,get_leads_for_TELEAGNI_TELEBDNI_TELEDDNI_with_derived_income_and_limit,get_leads_for_OMLIFE,get_leads_for_MIWAYHKT,get_leads_for_DIFFWT,get_leads_for_DIAGTE,get_leads_for_AGTEDI,get_leads_for_DITFCS,get_leads_for_CRISPIP3,get_leads_for_TELEFFWN_with_gender_derived_income_and_limit)
 from models.leads import info_tbl
+from models.campaigns import manual_dedupe_keys
+from crud.dedupe_campaigns import bulk_upsert_update_info_tbl_in_batches,select_code_from_campaign_dedupe_table
+
 from schemas.dedupe_campaigns import CreateDedupeCampaign,SubmitDedupeReturnSchema,ManualDedupeListReturn,StatusData,EnrichedData,CreateDedupeCampaign,DeleteCamapignSchema,UpdateDedupeCampaign
 from schemas.dedupes import AddDedupeListResponse
 from database.database import get_session
 from utils.auth import get_current_user,get_current_active_user
 from utils.status_data import get_status_tuple,insert_data_into_finance_table,insert_data_into_location_table,insert_data_into_contact_table,insert_data_into_employment_table,insert_data_into_car_table
 from database.database import engine
+
 from utils.logger import define_logger
 from database.master_db_connect import get_async_session
 
@@ -510,14 +515,10 @@ async def add_dedupe_list(camp_code:str,session:AsyncSession=Depends(get_async_s
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"Internal server error occured while adding a dedupe list for campaign:{camp_code}")
 
 
-
-
-
-
-
 #create a dedupe campaign,use the crud operation on the crud file
 
 @dedupe_routes.post("/dedupe-campaigns",status_code=status.HTTP_200_OK)
+
 async def create_dedupe_campaign(campaign:CreateDedupeCampaign,session:Session=Depends(get_session),user=Depends(get_current_user)):
     
     try:
@@ -545,8 +546,6 @@ async def create_dedupe_campaign(campaign:CreateDedupeCampaign,session:Session=D
 @dedupe_routes.post("/submit-dedupe-return",status_code=status.HTTP_200_OK)
 
 async def submit_dedupe_return(data:SubmitDedupeReturnSchema,dedupe_file:UploadFile=File(...),session:AsyncSession=Depends(get_async_session)):
-   
-   
     try:
         #read the uploaded file baba
         file_contents=await dedupe_file.read()
@@ -556,9 +555,7 @@ async def submit_dedupe_return(data:SubmitDedupeReturnSchema,dedupe_file:UploadF
 
         dedupe_list=[]
 
-        #dedupe_list2=[str(d[0],'UTF-8') for d in list_contents]
-
-        #new_tuple_list=[d for d in dedupe_list2 if re.match('^\d{13}$',d)]
+        
 
         for list in list_contents:
             #new tuple
@@ -568,20 +565,23 @@ async def submit_dedupe_return(data:SubmitDedupeReturnSchema,dedupe_file:UploadF
                 dedupe_list.append(new_tuple)
 
         #search for dedupe campaign that matches the campaign code
-        dedupe_query=select(Campaign_Dedupe.code).where(Campaign_Dedupe.code==data.code)
 
-        exec_dedupe_query=session.exec(dedupe_query).all()
+        #dedupe_query=select(Campaign_Dedupe.code).where(Campaign_Dedupe.code==data.code)
+        fetched_code=await select_code_from_campaign_dedupe_table(code=code)
+
+        #exec_dedupe_query=session.exec(dedupe_query).all()
         #raise an exception if the query fails
 
-        if exec_dedupe_query==None:
+        if fetched_code==None:
             dedupe_logger.info(f"campaign dedupe:{data.campaign_name} with code:{data.code} does not exist")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"campaign dedupe:{data.campaign_name} with code:{data.code}")
         
         #count the number of campaigns returned
-        campaign_count_query=(select(func.count()).select_from(Campaign_Dedupe).where(Campaign_Dedupe.code==data.code))
+
+        #campaign_count_query=(select(func.count()).select_from(Campaign_Dedupe).where(Campaign_Dedupe.code==data.code))
         #this value can also be zero,must be zero
 
-        campaign_count=session.exec(campaign_count_query).scalar_one()
+        #campaign_count=session.exec(campaign_count_query).scalar_one()
 
         #search the dedupe campaign
         # dedupe_campaign_stmt=select(Deduped_Campaigns).where(Deduped_Campaigns.camp_code==data.campaign_code)
@@ -592,7 +592,6 @@ async def submit_dedupe_return(data:SubmitDedupeReturnSchema,dedupe_file:UploadF
         camp_found=False
 
         if dedupe_campaign==None:
-
             camp_found=False
             dedupe_logger.info(f"campaign:{data.campaign_name} with campaign code:{data.campaign_code} does not exist or is not a dedupe campaign")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"dedupe campaign:{data.campaign_name} with campaign code:{data.campaign_code} does not exist")
@@ -628,8 +627,7 @@ async def submit_dedupe_return(data:SubmitDedupeReturnSchema,dedupe_file:UploadF
         session.exec(update_statement)
         #commit the session
         session.commit()
-        
-        
+
         id_query_from_campaign_dedupe=select(Campaign_Dedupe.id).where(Campaign_Dedupe.code==data.code and Campaign_Dedupe.status=='P')
         
         id_campaign_dedupe_query_exec=session.exec(id_query_from_campaign_dedupe).all()
@@ -1019,48 +1017,39 @@ async def add_manual_dedupe_list2(filename:Annotated[UploadFile,File()],camp_cod
 
         #dedupe_models=[]
         rows_read=len(rows)
+        if rows_read == 0:
+            dedupe_logger.info("The provided list is empty")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=f"Empty list provided for campaign:{camp_code}")
+        
+        data_insert_params=[{"id":row[0],"cell":row[1],"campaign_name":row[2],"status":row[3],"code":row[4]} for row in data]
 
-        campaigns=[Campaign_Dedupe(id=id,cell=cell,campaign_name=camp_code,status=status,key=key) for id,cell,camp_code,status,key in data]
+        #campaigns=[Campaign_Dedupe(id=id,cell=cell,campaign_name=camp_code,status=status,key=key) for id,cell,camp_code,status,key in data]
+
 
         try:
-            session.add_all(campaigns)
-            session.commit()
-            session.close()
-            dedupe_logger.info(f"inserted {len(campaigns)} records into the campaign dedupe table")
+            sql_insert_into_campaign_dedupe_tbl=text("INSERT INTO campaign_dedupe(id,cell,campaign_name,status,code) VALUES(:id,:cell,:campaign_name,:status,:code)")
+            await session.execute(sql_insert_into_campaign_dedupe_tbl,data_insert_params)
+            await session.commit()
+            dedupe_logger(f"inserted:{rows_read} into the campaign dedupe table")
+
 
         except Exception as e:
-            session.rollback()
-            session.close()
+            await session.rollback()
             dedupe_logger.exception(f"An exception occurred while:{e}")
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"An exception occurred while inserting data in the campaign dedupe table")
-
-
 
         # for item in data:
         #     model_instance=Campaign_Dedupe(id=item[0],cell_number=item[1],campaign_name=item[2],status=item[3],code=item[4])
         #     dedupe_models.append(model_instance)
         
-        dedupe_logger.info("connecting to the database for manual dedupe upload")
-       
         update_data=[(r[1],'DEDUPE') for r in rows]
 
-        query="""
-                INSERT INTO info_tbl(cell,extra_info)
-                VALUES(:cell,:extra_info)
-                ON CONFLICT(cell)
-                DO UPDATE SET extra_info=EXCLUDED.extra_info
-                WHERE info_tbl.cell = EXCLUDED.cell
-             """
+        update_data_to_list=[{"cell":cell,"extra_info":extra_info} for cell,extra_info in update_data]
+        
         try:
-            # insert and perform update 
-            # USE async engine
-            with engine.begin() as conn:
-                conn.execute(text(query),[{"cell":cell,"extra_info":info} for cell,info in update_data])
-                conn.close()
+            await bulk_upsert_update_info_tbl_in_batches(session,update_data_to_list,batch_size=1000)
             dedupe_logger.info(f"inserted records of length:{len(update_data)} on the info_tbl(information table)")
-
         except Exception as e:
-            conn.rollback()
             dedupe_logger.exception(f"an exception occurred while updating info_tbl with:{len(update_data)} data:{e}")
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"an internal server error occurred while inserting data into the info_tbl")
         
@@ -1086,7 +1075,13 @@ async def add_manual_dedupe_list2(filename:Annotated[UploadFile,File()],camp_cod
         #     dedupe_logger.error(e)
         #     session.rollback()
         #     raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"error occuured while processing the data")
+        
         # store this key somewhere on the DB(Database table, list key tracker table would be a good option)
+        
+        stored_key=manual_dedupe_keys(camp_code=camp_code,key_name=key)
+        session.add(stored_key)
+        await session.commit()
+        await session.close()
 
         return ManualDedupeListReturn(Success=True,Information_Table=f"{len(update_data)} records updated on the information table",Campaign_Dedupe_Table=f"{len(campaigns)} inserted on the campaign dedupe table",Key=key)
     

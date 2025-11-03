@@ -3,6 +3,8 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from typing import List,Optional
 from models.campaign_rules import dedupe_campaign_rules_tbl
 from schemas.dedupe_campaigns import CreateDedupeCampaign
+
+
 #create dedupe campaign rule
 
 async def create_dedupe_campaign_rule(rule:CreateDedupeCampaign,session:AsyncSession)->dedupe_campaign_rules_tbl:

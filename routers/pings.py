@@ -1,6 +1,6 @@
 from fastapi import APIRouter,status,HTTPException,UploadFile,File,Depends
 from fastapi.responses import JSONResponse
-from models.pings import pings_tbl
+from als_backend_api.models.ping_table import pings_tbl
 from typing import List
 import pandas as pd
 from datetime import datetime

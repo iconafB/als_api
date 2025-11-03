@@ -1,5 +1,7 @@
 from pydantic import BaseModel,Field
 from typing import Optional
+from sqlmodel import SQLModel
+from models.campaign_rules import RulesBase
 
 class CreateCampaignRule(BaseModel):
     rule_name:str=Field(default=None,min_length=2,max_length=15)
@@ -11,6 +13,23 @@ class CreateCampaignRule(BaseModel):
     typedata:str=Field(default="Status",min_length=1,max_length=20)
     last_used:int
     rule_location:str
+
+
+class RuleCreate(SQLModel):
+    rule_name: str = Field(...,max_length=15,min_length=15)
+    typedata: str = Field(default="Status", max_length=50)
+    start_year: int = Field(..., ge=1900, le=2100)
+    end_year: int = Field(..., ge=1900, le=2100)
+    min_salary: Optional[float] = None
+    days_inactive: int = Field(..., ge=0,default=29)
+    record_limit: int = Field(..., ge=1, le=10000)
+    gender: Optional[str] = Field(default=None)
+    @classmethod
+    def validate(cls, values):
+        return RulesBase.validate(values)
+
+
+
 
 
 class RuleSQLColumn(BaseModel):

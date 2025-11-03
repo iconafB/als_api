@@ -2,16 +2,18 @@ from fastapi import APIRouter,HTTPException,status,Depends,Query,Path,Request
 from sqlmodel import Session,select
 from datetime import datetime
 from typing import List
+from sqlmodel.ext.asyncio.session import AsyncSession
 from models.users import users_table
 from models.campaign_rules import rules_tbl
 from models.campaigns import campaign_tbl,campaign_rules_tbl
 from schemas.sql_rule import Sql_Rules,Change_Active_Rule
-from schemas.campaign_rules import CreateCampaignRule,ChangeCampaignResponse,CreateDedupeCampaignRule
+from schemas.campaign_rules import CreateCampaignRule,ChangeCampaignResponse,CreateDedupeCampaignRule,RuleCreate
 from schemas.campaign_rules_input import FetchRuleResponse,UpdateCampaignRulesResponse
 from database.database import get_session
+from database.master_db_connect import get_async_session
 from utils.logger import define_logger
 from utils.auth import get_current_active_user
-
+from crud.campaign_rules import (create_campaign_rule)
 campaign_rule_router=APIRouter(tags=["Generic Campaign Rules"],prefix="/campaign-rules")
 
 campaign_rules_logger=define_logger("als campaign rules","logs/campaign_rules_logs")
@@ -44,48 +46,20 @@ campaign_rules_logger=define_logger("als campaign rules","logs/campaign_rules_lo
 
 @campaign_rule_router.post("",status_code=status.HTTP_200_OK,description="Create a campaign rule by the necessary info",response_model=rules_tbl)
 
-async def create_campaign_rule(req:Request,rule:CreateCampaignRule,session:Session=Depends(get_session)):
+async def create_campaign_rule(req:Request,rule:RuleCreate,session:AsyncSession=Depends(get_async_session)):
     
     try:
         #search if the user exists
         #see if the campaign rule exists
         print("print the request object headers type")
         print(req.headers['content-type'])
-        campaign_rule_query=select(rules_tbl).where(rules_tbl.rule_name==rule.rule_name)
-        campaign_rule=session.exec(campaign_rule_query).first()
-        if not campaign_rule==None:
-            #campaign_rules_logger.info(f"user:{user.id} with email:{user.email} tried to create campaign rule:{rule.campaign_code}")
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=f"rule_name:{rule.rule_name} already exists")
-        #create the campaign rule
-
-        if rule.birth_year_start > rule.birth_year_end:
-
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="start year cannot be greater than the end year")
-       
-
-        # json_data={
-        #     "salary":rule.minimum_salary,
-        #     "start_year":rule.start_year,
-        #     "end_year":rule.end_year,
-        #     "limit":rule.limit,
-        #     "last_used":rule.last_used,
-        #     "gender":rule.gender
-        # }
-
-        create_rule=rules_tbl(rule_name=rule.rule_name,rule_location=rule.rule_location,salary=rule.salary,gender=rule.gender,birth_year_start=rule.birth_year_start,birth_year_end=rule.birth_year_end,last_used=rule.last_used,limit=rule.limit)
-
-        session.add(create_rule)
-        session.commit()
-        session.refresh(create_rule)
-
         #campaign_rules_logger.info(f"user:{user.id} with email:{user.email} created campaign rule with rule name:{rule.campaign_code}")
+        create_rule=await create_campaign_rule(rule,session)
         campaign_rules_logger.info(f"campaign rule created:{rule.rule_name}")
         return create_rule
     
     except Exception as e:
         campaign_rules_logger.error(f"{str(e)}")
-        print("print the error that occurred with status code 500")
-        print(e)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"An internal server error occured while creating a campaign rule:{rule.rule_name}")
 
 
@@ -208,7 +182,7 @@ async def assign_active_rule_to_campaign(rule_code:int,camp_code:str,session:Ses
 
 @campaign_rule_router.get("/{rule_name}",status_code=status.HTTP_200_OK,response_model=rules_tbl)
 
-async def fetch_rule_code(rule_name:str=Path(...,description="Provide the campaign code as the rule name"),session:Session=Depends(get_session),user=Depends(get_current_active_user)):
+async def fetch_rule_code(rule_name:str=Path(...,description="Provide the campaign code as the rule name"),session:AsyncSession=Depends(get_async_session),user=Depends(get_current_active_user)):
     try:
         rule_name_query=select(rules_tbl).where(rules_tbl.rule_name==rule_name)
         rule_name_entry=session.exec(rule_name_query).first()
@@ -216,6 +190,7 @@ async def fetch_rule_code(rule_name:str=Path(...,description="Provide the campai
             campaign_rules_logger.info(f"user with id:{user.id} and email:{user.email} requested a campaign with rule name:{rule_name}")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"campaign rule with:{rule_name} does not exist")
         return rule_name_entry
+    
     except Exception as e:
         campaign_rules_logger.error(f"{str(e)}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error occurred while fetching campaign rule name:{rule_name}")
@@ -263,6 +238,7 @@ async def fetch_campaign_rules(page:int=Query(1,ge=10),size:int=Query(10,ge=1,le
     except Exception as e:
         campaign_rules_logger.error(f"{str(e)}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"Internal server error")
+
 
 @campaign_rule_router.put("/{rule_code}")
 async def assign_campaign_rule_to_campaign(rule_code:int):

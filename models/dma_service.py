@@ -51,7 +51,6 @@ class dma_validation_data(SQLModel,table=True):
     opted_out:bool=Field(nullable=True,default=None) 
     created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
 
-
 class list_tracker_table(SQLModel,table=True):
     id:Optional[int]=Field(primary_key=True,default=None,nullable=False)
     list_name:str=Field(nullable=True,default=None,index=True)

@@ -5,7 +5,6 @@ from sqlalchemy import func
 
 #assign a sql rule to a campaign
 
-
 #final
 class rules_tbl(SQLModel,table=True):
     rule_code:Optional[int]=Field(primary_key=True,default=None)
