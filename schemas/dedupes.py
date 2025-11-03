@@ -13,3 +13,12 @@ class DataInsertionSchema(BaseModel):
     number_of_leads:int
     Success:bool
 
+
+class AddDedupeListResponse(BaseModel):
+    status:bool
+    file_name:str
+    campaign_name:str
+    key:str
+    
+
+

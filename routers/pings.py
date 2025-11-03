@@ -68,6 +68,7 @@ async def update_als_ping_status(ping_status:List[PingStatusPayload],session:Asy
             await session.commit()
         session.close()
         length=len(ping_status)
+
         with open("Ping_Results.txt","+a") as file:
             for rec in ping_status:
                 file.write(f"{rec.telnr},{rec.status},{rec.duration}")
@@ -93,6 +94,7 @@ async def submit_pings_to_dedago(file:UploadFile=File(...,description="Cell numb
         contents=await file.read()
         dataFrame=pd.DataFrame(contents.splitlines())
         list_contents=dataFrame.values.tolist()
+        
         numbers=[d[0].decode() for d in list_contents]
 
         send_numbers=send_pings_to_dedago(numbers)

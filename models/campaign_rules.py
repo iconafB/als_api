@@ -28,3 +28,5 @@ class dedupe_campaign_rules_tbl(SQLModel,table=True):
     gender:str=Field(nullable=True,default=None)
     derived_income:int=Field(nullable=True,default=None)
     limit:int=Field(nullable=True,default=None)
+    is_deduped:bool=Field(nullable=False,default=True)
+    is_active:bool=Field(nullable=False,default=True)

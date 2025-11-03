@@ -21,9 +21,7 @@ dma_logger=define_logger("dmasa ","logs/dma.log")
 
 #For all the methods use try catch nigga, shitty code
 class DMA_Class():
-    
     def __init__(self):
-
         self.dmasa_api_key=get_settings().dmasa_api_key
         self.dmasa_member_id=get_settings().dmasa_member_id
         self.check_credits_dmasa_url=get_settings().check_credits_dmasa_url
@@ -125,20 +123,18 @@ class DMA_Class():
         return response
     
     #you need to poll this nonsense
+
     def read_dedupe_output(self,audit_id):
         #This is nonsense
         try:
             #try statement
             #dmasa_output_url=self.read_dedupe_output_url + self.dmasa_member_id + '&API_Key'+ self.dmasa_api_key + '&AuditId'+ audit_id
-            
             base_url=self.read_dedupe_output_url
             params_dict={}
             params_dict['DedupeAuditId']=audit_id
             params_dict['MemberID']=self.dmasa_member_id
             params_dict['API_Key']=self.dmasa_api_key
-
             response_output=requests.get(url=base_url,params=params_dict,verify=False,timeout=10)
-
             return response_output
         
         except Exception as e:
@@ -388,7 +384,6 @@ class DMA_Class():
            #await send_email()
            return True
         return
-
 
 def get_dmasa_service():
     return DMA_Class()

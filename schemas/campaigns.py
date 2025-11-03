@@ -7,6 +7,7 @@ class CreateCampaign(SQLModel):
     camp_code:str=Field(min_length=1,max_length=100)
     campaign_name:str=Field(min_length=1,max_length=100)
 
+
 class CreateCampaignResponse(SQLModel):
     id:int
     camp_code:str=Field(min_length=1,max_length=100)
@@ -51,3 +52,7 @@ class LoadCampaignResponse(BaseModel):
     number_of_leads_submitted:int
 
 
+class CreateCampaign(BaseModel):
+    branch:str
+    camp_name:str
+    camp_code:str

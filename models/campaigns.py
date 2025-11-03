@@ -39,9 +39,9 @@ class Rule(SQLModel):
 class Deduped_Campaigns(SQLModel,table=True):
     id:Optional[int]=Field(primary_key=True,nullable=False,default=None)
     branch:str=Field(nullable=False,default=None)
-    camp_name:str=Field(nullable=False,default=None)
+    camp_name:str=Field(nullable=False,default=None,index=True)
     camp_code:str=Field(nullable=False,default=None)
-    camp_rule:Rule=Field(default_factory=Rule,sa_column=Column(JSON))
+    #camp_rule:Rule=Field(default_factory=Rule,sa_column=Column(JSON))
     created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
 
 
@@ -53,10 +53,11 @@ class campaign_rules_tbl(SQLModel,table=True):
     is_active:bool=Field(nullable=False,default=None)
 
 class dedupe_campaigns_tbl(SQLModel,table=True):
-    id:Optional[int]=Field(primary_key=True,nullable=False,default=None)
+    camp_id:Optional[int]=Field(primary_key=True,nullable=False,default=None)
     branch:str=Field(nullable=False,default=None)
     campaign_name:str=Field(nullable=False,default=None,index=True)
     camp_code:str=Field(nullable=False,default=None,index=True)
     is_active:str=Field(nullable=False,default=True)
-    cerated_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
+    is_deduped:bool=Field(nullable=True,default=None)
+    created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
 

@@ -27,3 +27,13 @@ class ChangeCampaignResponse(BaseModel):
     rule_sql:RuleSQLColumn
 
 
+class CreateDedupeCampaignRule(BaseModel):
+    rule_name:str
+    salary:int
+    derived_income:int
+    gender:str
+    limit:int
+    is_deduped:bool=Field(default=True)
+
+
+

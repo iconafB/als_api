@@ -3,15 +3,6 @@ from typing import Optional,Union
 import re
 from datetime import datetime
 
-class CreateDedupeCampaign(BaseModel):
-    branch:str
-    campaign_name:str
-    campaign_code:str
-    maximum_salary:Optional[int]=None
-    minimum_salary:Optional[int]=None
-    derived_income:Optional[int]=None
-    gender:Optional[str]=None
-    limit:Optional[int]=None
 
 class CreateDedupeCampaign(BaseModel):
     branch:str
