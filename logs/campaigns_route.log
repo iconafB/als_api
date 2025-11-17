@@ -1,2 +1,274 @@
 2025-09-23 09:26:24,874 - als campaign logs - INFO - campaign with campaign code:MIWAY created successfully
 2025-09-23 09:28:01,275 - als campaign logs - INFO - campaign:TELESUREYORK with campaign code:TELESURE created successfully
+2025-11-12 12:40:16,268 - als campaign logs - INFO - user:3 with email:tim@gmail.com created campaign:Durban_XLS_DBN from branch:Durban
+2025-11-12 12:40:16,268 - als campaign logs - INFO - user:3 with email:tim@gmail.com created campaign:Durban_XLS_DBN from branch:Durban
+2025-11-12 12:40:16,272 - als campaign logs - ERROR - internal server error occurred:1 validation error for CreateCampaignResponse
+id
+  Field required [type=missing, input_value=campaign_tbl(), input_type=campaign_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+Traceback (most recent call last):
+  File "C:\Users\iconaf\Documents\als_folder\als_backend_api\crud\campaigns.py", line 28, in create_campaign_db
+    return CreateCampaignResponse.model_validate(db_campaign)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "C:\Users\iconaf\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\main.py", line 716, in model_validate
+    return cls.__pydantic_validator__.validate_python(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        obj,
+        ^^^^
+    ...<5 lines>...
+        by_name=by_name,
+        ^^^^^^^^^^^^^^^^
+    )
+    ^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for CreateCampaignResponse
+id
+  Field required [type=missing, input_value=campaign_tbl(), input_type=campaign_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+2025-11-12 12:40:16,272 - als campaign logs - ERROR - internal server error occurred:1 validation error for CreateCampaignResponse
+id
+  Field required [type=missing, input_value=campaign_tbl(), input_type=campaign_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+Traceback (most recent call last):
+  File "C:\Users\iconaf\Documents\als_folder\als_backend_api\crud\campaigns.py", line 28, in create_campaign_db
+    return CreateCampaignResponse.model_validate(db_campaign)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "C:\Users\iconaf\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\main.py", line 716, in model_validate
+    return cls.__pydantic_validator__.validate_python(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        obj,
+        ^^^^
+    ...<5 lines>...
+        by_name=by_name,
+        ^^^^^^^^^^^^^^^^
+    )
+    ^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for CreateCampaignResponse
+id
+  Field required [type=missing, input_value=campaign_tbl(), input_type=campaign_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+2025-11-12 12:42:54,167 - als campaign logs - INFO - user:3 with email:tim@gmail.com requested campaign:Durban_XLS_DBN with campaign code:Durban_XLS from this branch:Durban
+2025-11-12 12:42:54,167 - als campaign logs - INFO - user:3 with email:tim@gmail.com requested campaign:Durban_XLS_DBN with campaign code:Durban_XLS from this branch:Durban
+2025-11-12 12:43:31,495 - als campaign logs - INFO - user:3 with email:tim@gmail.com created campaign:Durban_XLS_DBN from branch:Durban_XLS
+2025-11-12 12:43:31,495 - als campaign logs - INFO - user:3 with email:tim@gmail.com created campaign:Durban_XLS_DBN from branch:Durban_XLS
+2025-11-12 12:43:31,497 - als campaign logs - ERROR - internal server error occurred:1 validation error for CreateCampaignResponse
+id
+  Field required [type=missing, input_value=campaign_tbl(), input_type=campaign_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+Traceback (most recent call last):
+  File "C:\Users\iconaf\Documents\als_folder\als_backend_api\crud\campaigns.py", line 28, in create_campaign_db
+    return CreateCampaignResponse.model_validate(db_campaign)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "C:\Users\iconaf\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\main.py", line 716, in model_validate
+    return cls.__pydantic_validator__.validate_python(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        obj,
+        ^^^^
+    ...<5 lines>...
+        by_name=by_name,
+        ^^^^^^^^^^^^^^^^
+    )
+    ^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for CreateCampaignResponse
+id
+  Field required [type=missing, input_value=campaign_tbl(), input_type=campaign_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+2025-11-12 12:43:31,497 - als campaign logs - ERROR - internal server error occurred:1 validation error for CreateCampaignResponse
+id
+  Field required [type=missing, input_value=campaign_tbl(), input_type=campaign_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+Traceback (most recent call last):
+  File "C:\Users\iconaf\Documents\als_folder\als_backend_api\crud\campaigns.py", line 28, in create_campaign_db
+    return CreateCampaignResponse.model_validate(db_campaign)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "C:\Users\iconaf\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\main.py", line 716, in model_validate
+    return cls.__pydantic_validator__.validate_python(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        obj,
+        ^^^^
+    ...<5 lines>...
+        by_name=by_name,
+        ^^^^^^^^^^^^^^^^
+    )
+    ^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for CreateCampaignResponse
+id
+  Field required [type=missing, input_value=campaign_tbl(), input_type=campaign_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+2025-11-12 12:52:22,909 - als campaign logs - INFO - user:3 with email:tim@gmail.com attempted to retriev campaign:KING_PR_HQ
+2025-11-12 12:52:22,909 - als campaign logs - INFO - user:3 with email:tim@gmail.com attempted to retriev campaign:KING_PR_HQ
+2025-11-12 12:52:22,910 - als campaign logs - INFO - user:3 with email:tim@gmail.com requested campaign:KING_PRICE_DIGITAL with campaign code:KING_PR_HQ from this branch:HQ
+2025-11-12 12:52:22,910 - als campaign logs - INFO - user:3 with email:tim@gmail.com requested campaign:KING_PRICE_DIGITAL with campaign code:KING_PR_HQ from this branch:HQ
+2025-11-12 12:54:14,496 - als campaign logs - INFO - user:3 with email:tim@gmail.com attempted to retrievE campaign:KING_PR_DIGITAL
+2025-11-12 12:54:14,496 - als campaign logs - INFO - user:3 with email:tim@gmail.com attempted to retrievE campaign:KING_PR_DIGITAL
+2025-11-12 12:54:14,497 - als campaign logs - INFO - user:3 with email:tim@gmail.com requested campaign:KING_PRICE_DIGITAL2 with campaign code:KING_PR_DIGITAL from this branch:HQ
+2025-11-12 12:54:14,497 - als campaign logs - INFO - user:3 with email:tim@gmail.com requested campaign:KING_PRICE_DIGITAL2 with campaign code:KING_PR_DIGITAL from this branch:HQ
+2025-11-12 12:56:28,279 - als campaign logs - INFO - user:3 with email:tim@gmail.com attempted to retrievE campaign:KING_PR_DIGITAL
+2025-11-12 12:56:28,279 - als campaign logs - INFO - user:3 with email:tim@gmail.com attempted to retrievE campaign:KING_PR_DIGITAL
+2025-11-12 12:56:28,280 - als campaign logs - INFO - user:3 with email:tim@gmail.com requested campaign:KING_PRICE_DIGITAL2 with campaign code:KING_PR_DIGITAL from this branch:HQ
+2025-11-12 12:56:28,280 - als campaign logs - INFO - user:3 with email:tim@gmail.com requested campaign:KING_PRICE_DIGITAL2 with campaign code:KING_PR_DIGITAL from this branch:HQ
+2025-11-12 13:50:00,318 - als campaign logs - INFO - user:3 with email:tim@gmail.com attempted to retrievE campaign:KING_PR_DIGITAL
+2025-11-12 13:50:00,318 - als campaign logs - INFO - user:3 with email:tim@gmail.com attempted to retrievE campaign:KING_PR_DIGITAL
+2025-11-12 13:50:00,319 - als campaign logs - INFO - user:3 with email:tim@gmail.com requested campaign:KING_PRICE_DIGITAL2 with campaign code:KING_PR_DIGITAL from this branch:HQ
+2025-11-12 13:50:00,319 - als campaign logs - INFO - user:3 with email:tim@gmail.com requested campaign:KING_PRICE_DIGITAL2 with campaign code:KING_PR_DIGITAL from this branch:HQ
+2025-11-12 14:34:55,770 - als campaign logs - INFO - user:3 with email:tim@gmail.com attempted to retrievE campaign:KING_PR_DIGITAL2
+2025-11-12 14:34:55,770 - als campaign logs - INFO - user:3 with email:tim@gmail.com attempted to retrievE campaign:KING_PR_DIGITAL2
+2025-11-12 14:34:55,771 - als campaign logs - INFO - user:3 with email:tim@gmail.com requested campaign:KING_PRICE_DIGITAL23 with campaign code:KING_PR_DIGITAL2 from this branch:HQ
+2025-11-12 14:34:55,771 - als campaign logs - INFO - user:3 with email:tim@gmail.com requested campaign:KING_PRICE_DIGITAL23 with campaign code:KING_PR_DIGITAL2 from this branch:HQ
+2025-11-12 14:36:54,716 - als campaign logs - INFO - user:3 with email:tim@gmail.com attempted to retrievE campaign:KING_PR_DIGITAL2
+2025-11-12 14:36:54,716 - als campaign logs - INFO - user:3 with email:tim@gmail.com attempted to retrievE campaign:KING_PR_DIGITAL2
+2025-11-12 14:36:54,718 - als campaign logs - INFO - user:3 with email:tim@gmail.com requested campaign:KING_PRICE_DIGITAL23 with campaign code:KING_PR_DIGITAL2 from this branch:HQ
+2025-11-12 14:36:54,718 - als campaign logs - INFO - user:3 with email:tim@gmail.com requested campaign:KING_PRICE_DIGITAL23 with campaign code:KING_PR_DIGITAL2 from this branch:HQ
+2025-11-12 14:38:47,755 - als campaign logs - INFO - user:3 with email:tim@gmail.com attempted to retrievE campaign:KING_PR_DIGITAL2
+2025-11-12 14:38:47,755 - als campaign logs - INFO - user:3 with email:tim@gmail.com attempted to retrievE campaign:KING_PR_DIGITAL2
+2025-11-12 14:38:47,786 - als campaign logs - INFO - user:3 with email:tim@gmail.com created campaign:KING_PRICE_DIGITAL23 from branch:HQ
+2025-11-12 14:38:47,786 - als campaign logs - INFO - user:3 with email:tim@gmail.com created campaign:KING_PRICE_DIGITAL23 from branch:HQ
+2025-11-12 14:38:47,793 - als campaign logs - ERROR - internal server error occurred:1 validation error for CreateCampaignResponse
+id
+  Field required [type=missing, input_value=campaign_tbl(), input_type=campaign_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+Traceback (most recent call last):
+  File "C:\Users\iconaf\Documents\als_folder\als_backend_api\crud\campaigns.py", line 33, in create_campaign_db
+    return CreateCampaignResponse.model_validate(db_campaign)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "C:\Users\iconaf\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\main.py", line 716, in model_validate
+    return cls.__pydantic_validator__.validate_python(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        obj,
+        ^^^^
+    ...<5 lines>...
+        by_name=by_name,
+        ^^^^^^^^^^^^^^^^
+    )
+    ^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for CreateCampaignResponse
+id
+  Field required [type=missing, input_value=campaign_tbl(), input_type=campaign_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+2025-11-12 14:38:47,793 - als campaign logs - ERROR - internal server error occurred:1 validation error for CreateCampaignResponse
+id
+  Field required [type=missing, input_value=campaign_tbl(), input_type=campaign_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+Traceback (most recent call last):
+  File "C:\Users\iconaf\Documents\als_folder\als_backend_api\crud\campaigns.py", line 33, in create_campaign_db
+    return CreateCampaignResponse.model_validate(db_campaign)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "C:\Users\iconaf\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\main.py", line 716, in model_validate
+    return cls.__pydantic_validator__.validate_python(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        obj,
+        ^^^^
+    ...<5 lines>...
+        by_name=by_name,
+        ^^^^^^^^^^^^^^^^
+    )
+    ^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for CreateCampaignResponse
+id
+  Field required [type=missing, input_value=campaign_tbl(), input_type=campaign_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+2025-11-12 14:40:02,203 - als campaign logs - ERROR - An internal server error occurred:1 validation error for CreateCampaignResponse
+id
+  Field required [type=missing, input_value=campaign_tbl(camp_code='K...DIGITAL23', branch='HQ'), input_type=campaign_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+Traceback (most recent call last):
+  File "C:\Users\iconaf\Documents\als_folder\als_backend_api\crud\campaigns.py", line 96, in get_campaign_by_code_db
+    return CreateCampaignResponse.model_validate(result)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\iconaf\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\main.py", line 716, in model_validate
+    return cls.__pydantic_validator__.validate_python(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        obj,
+        ^^^^
+    ...<5 lines>...
+        by_name=by_name,
+        ^^^^^^^^^^^^^^^^
+    )
+    ^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for CreateCampaignResponse
+id
+  Field required [type=missing, input_value=campaign_tbl(camp_code='K...DIGITAL23', branch='HQ'), input_type=campaign_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+2025-11-12 14:40:02,203 - als campaign logs - ERROR - An internal server error occurred:1 validation error for CreateCampaignResponse
+id
+  Field required [type=missing, input_value=campaign_tbl(camp_code='K...DIGITAL23', branch='HQ'), input_type=campaign_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+Traceback (most recent call last):
+  File "C:\Users\iconaf\Documents\als_folder\als_backend_api\crud\campaigns.py", line 96, in get_campaign_by_code_db
+    return CreateCampaignResponse.model_validate(result)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\iconaf\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\main.py", line 716, in model_validate
+    return cls.__pydantic_validator__.validate_python(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        obj,
+        ^^^^
+    ...<5 lines>...
+        by_name=by_name,
+        ^^^^^^^^^^^^^^^^
+    )
+    ^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for CreateCampaignResponse
+id
+  Field required [type=missing, input_value=campaign_tbl(camp_code='K...DIGITAL23', branch='HQ'), input_type=campaign_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+2025-11-12 14:42:11,495 - als campaign logs - ERROR - An internal server error occurred:1 validation error for CreateCampaignResponse
+id
+  Field required [type=missing, input_value=campaign_tbl(camp_code='K...DIGITAL23', branch='HQ'), input_type=campaign_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+Traceback (most recent call last):
+  File "C:\Users\iconaf\Documents\als_folder\als_backend_api\crud\campaigns.py", line 96, in get_campaign_by_code_db
+    return CreateCampaignResponse.model_validate(result)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\iconaf\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\main.py", line 716, in model_validate
+    return cls.__pydantic_validator__.validate_python(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        obj,
+        ^^^^
+    ...<5 lines>...
+        by_name=by_name,
+        ^^^^^^^^^^^^^^^^
+    )
+    ^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for CreateCampaignResponse
+id
+  Field required [type=missing, input_value=campaign_tbl(camp_code='K...DIGITAL23', branch='HQ'), input_type=campaign_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+2025-11-12 14:42:11,495 - als campaign logs - ERROR - An internal server error occurred:1 validation error for CreateCampaignResponse
+id
+  Field required [type=missing, input_value=campaign_tbl(camp_code='K...DIGITAL23', branch='HQ'), input_type=campaign_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+Traceback (most recent call last):
+  File "C:\Users\iconaf\Documents\als_folder\als_backend_api\crud\campaigns.py", line 96, in get_campaign_by_code_db
+    return CreateCampaignResponse.model_validate(result)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\Users\iconaf\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\main.py", line 716, in model_validate
+    return cls.__pydantic_validator__.validate_python(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        obj,
+        ^^^^
+    ...<5 lines>...
+        by_name=by_name,
+        ^^^^^^^^^^^^^^^^
+    )
+    ^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for CreateCampaignResponse
+id
+  Field required [type=missing, input_value=campaign_tbl(camp_code='K...DIGITAL23', branch='HQ'), input_type=campaign_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+2025-11-12 14:47:46,964 - als campaign logs - INFO - user:3 with email:tim@gmail.com requested campaign:KING_PRICE_DIGITAL23 with campaign code:KING_PR_DIGITAL2 from this branch:HQ
+2025-11-12 14:47:46,964 - als campaign logs - INFO - user:3 with email:tim@gmail.com requested campaign:KING_PRICE_DIGITAL23 with campaign code:KING_PR_DIGITAL2 from this branch:HQ
+2025-11-12 14:48:43,564 - als campaign logs - INFO - user:3 with email:tim@gmail.com requested campaign:KING_PRICE_DIGITAL23 with campaign code:KING_PR_DIGITAL2 from this branch:HQ
+2025-11-12 14:48:43,564 - als campaign logs - INFO - user:3 with email:tim@gmail.com requested campaign:KING_PRICE_DIGITAL23 with campaign code:KING_PR_DIGITAL2 from this branch:HQ
+2025-11-12 14:49:33,134 - als campaign logs - INFO - user:3 with email:tim@gmail.com attempted to retrievE campaign:KING_PR_DIGITALP3
+2025-11-12 14:49:33,134 - als campaign logs - INFO - user:3 with email:tim@gmail.com attempted to retrievE campaign:KING_PR_DIGITALP3
+2025-11-12 14:49:33,181 - als campaign logs - INFO - user:3 with email:tim@gmail.com created campaign:KING_PRICE_DIGITALP3 from branch:P3
+2025-11-12 14:49:33,181 - als campaign logs - INFO - user:3 with email:tim@gmail.com created campaign:KING_PRICE_DIGITALP3 from branch:P3
+2025-11-12 14:49:33,182 - als campaign logs - INFO - campaign:KING_PRICE_DIGITALP3 with campaign code:KING_PR_DIGITALP3 created successfully by user with user_id:3 and email:tim@gmail.com
+2025-11-12 14:49:33,182 - als campaign logs - INFO - campaign:KING_PRICE_DIGITALP3 with campaign code:KING_PR_DIGITALP3 created successfully by user with user_id:3 and email:tim@gmail.com
+2025-11-12 14:49:47,806 - als campaign logs - INFO - user:3 with email:tim@gmail.com requested campaign:KING_PRICE_DIGITALP3 with campaign code:KING_PR_DIGITALP3 from this branch:P3
+2025-11-12 14:49:47,806 - als campaign logs - INFO - user:3 with email:tim@gmail.com requested campaign:KING_PRICE_DIGITALP3 with campaign code:KING_PR_DIGITALP3 from this branch:P3
+2025-11-12 14:50:37,705 - als campaign logs - INFO - user:3 with email:tim@gmail.com requested campaign:KING_PRICE_DIGITALP3 with campaign code:KING_PR_DIGITALP3 from this branch:P3
+2025-11-12 14:50:37,705 - als campaign logs - INFO - user:3 with email:tim@gmail.com requested campaign:KING_PRICE_DIGITALP3 with campaign code:KING_PR_DIGITALP3 from this branch:P3
+2025-11-12 14:51:39,885 - als campaign logs - INFO - user:3 with email:tim@gmail.com successfully fetched campaign:KING_PR_DIGITALP3
+2025-11-12 14:51:39,885 - als campaign logs - INFO - user:3 with email:tim@gmail.com successfully fetched campaign:KING_PR_DIGITALP3
+2025-11-12 14:51:43,699 - als campaign logs - INFO - user:3 with email:tim@gmail.com successfully fetched campaign:KING_PR_DIGITALP3
+2025-11-12 14:51:43,699 - als campaign logs - INFO - user:3 with email:tim@gmail.com successfully fetched campaign:KING_PR_DIGITALP3

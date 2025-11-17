@@ -1,6 +1,6 @@
 from fastapi import APIRouter,status,HTTPException,UploadFile,File,Depends
 from fastapi.responses import JSONResponse
-from als_backend_api.models.ping_table import pings_tbl
+from models.ping_table import ping_tbl
 from typing import List
 import pandas as pd
 from datetime import datetime
@@ -8,7 +8,7 @@ from sqlmodel import SQLModel,select,text
 from utils.pings import send_pings_to_dedago
 from utils.logger import define_logger
 from schemas.pings import PingStatusResponse,PingStatusPayload,PingStatusUpdateResponse,SendPingsToDedago
-from database.master_db_connect import get_async_master_db_session
+from database.master_db_connect import get_async_session
 from sqlalchemy.ext.asyncio import AsyncSession
 import pandas as pd
 
@@ -54,7 +54,7 @@ async def submit_pings_to_dedago(file:UploadFile=File(...)):
 
 @ping_router.post("/als/leads_ping",status_code=status.HTTP_200_OK)
 
-async def update_als_ping_status(ping_status:List[PingStatusPayload],session:AsyncSession=Depends(get_async_master_db_session)):
+async def update_als_ping_status(ping_status:List[PingStatusPayload],session:AsyncSession=Depends(get_async_session)):
     try:
         todaysdate=datetime.today().strftime("%Y-%m-%d")
         

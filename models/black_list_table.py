@@ -1,12 +1,15 @@
 from sqlalchemy import func
 from sqlmodel import SQLModel,Field,Relationship
-from typing import Optional,List
-from datetime import datetime
-from models.contact_table import contact_tbl
+from typing import Optional,List,TYPE_CHECKING
+from datetime import date
+
+
+if TYPE_CHECKING:
+    from models.information_table import info_tbl
 
 class blacklist_tbl(SQLModel,table=True):
-    cell:str=Field(primary_key=True,default=None)
-    dmasa_status:bool=Field(nullable=False,default=None)
-    dnc_status:bool=Field(nullable=False,default=None)
-    dma_date:Optional[datetime.date]=Field(nullable=False,sa_column_kwargs={"server_default":"NOW()"})
-    contact:Optional[contact_tbl]=Relationship(back_populates="blacklist")
+    cell:str=Field(primary_key=True,foreign_key="info_tbl.cell")
+    dmasa_status:Optional[bool]=None
+    dnc_status:Optional[bool]=None
+    dma_date:Optional[date]=None
+    #info_tbl:Optional["info_tbl"]=Relationship(back_populates="blacklist")

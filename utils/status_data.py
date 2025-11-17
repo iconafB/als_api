@@ -3,17 +3,21 @@ from sqlmodel import Session
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.dialects import postgresql
 from sqlalchemy import insert,and_,or_
-from database.master_db_connect import get_master_db_session,get_async_master_db_session
+from database.master_db_connect import master_async_engine,get_async_session
 from database.database import get_session
 from utils.logger import define_logger
-from models.leads import contact_tbl,info_tbl,employment_tbl,location_tbl,car_tbl
-from models.leads import finance_tbl
+from models.contact_table import contact_tbl
+from models.information_table import info_tbl
+from models.employment_table import employment_tbl
+from models.location_table import location_tbl
+from models.car_table import car_tbl
+from models.finance_table import finance_tbl
 
 status_data_logger=define_logger("als status logger logs","logs/status_data.log")
 
 #execute whatever is return from these methods
 
-async def insert_data_into_finance_table(data:list,session:Session=Depends(get_master_db_session),async_session:AsyncSession=Depends(get_async_master_db_session)):
+async def insert_data_into_finance_table(data:list,async_session:AsyncSession=Depends(get_async_session)):
 
     try:
         insert_stmt=postgresql.insert(finance_tbl).values(**data).on_conflict_do_nothing(index_elements=[finance_tbl.cell])
@@ -30,7 +34,7 @@ async def insert_data_into_finance_table(data:list,session:Session=Depends(get_m
         await async_session.close()
         return False
     
-async def insert_data_into_car_table(data:list,session:Session=Depends(get_master_db_session),async_session:AsyncSession=Depends(get_async_master_db_session)):
+async def insert_data_into_car_table(data:list,async_session:AsyncSession=Depends(get_async_session)):
 
     try:
         insert_stmt=postgresql.insert(car_tbl).values(**data).on_conflict_do_nothing(index_elements=[car_tbl.cell])
@@ -49,9 +53,10 @@ async def insert_data_into_car_table(data:list,session:Session=Depends(get_maste
 
 #return type for these methods
 
-async def insert_data_into_employment_table(data:dict,session:Session=Depends(get_master_db_session),async_session:AsyncSession=Depends(get_async_master_db_session)):
+async def insert_data_into_employment_table(data:dict,async_session:AsyncSession=Depends(get_async_session)):
     try:
         insert_stmt=postgresql.insert(employment_tbl.__tablename__).values(**data)
+        
         on_conflict_smt=insert_stmt.on_conflict_do_nothing(index_elements=[employment_tbl.cell])
         await async_session.execute(on_conflict_smt)
         await async_session.commit()
@@ -66,10 +71,12 @@ async def insert_data_into_employment_table(data:dict,session:Session=Depends(ge
         return False
         #raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"{str(e)}")
 
-async def insert_data_into_contact_table(data:dict,session:Session=Depends(get_master_db_session),async_session:AsyncSession=Depends(get_async_master_db_session)):
+async def insert_data_into_contact_table(data:dict,async_session:AsyncSession=Depends(get_async_session)):
     try:
         insert_stmt=postgresql.insert(contact_tbl.__tablename__).values(**data)
+
         excluded=insert_stmt.excluded
+
         update_where_clause=contact_tbl.cell==excluded.cell
         on_conflict_stmt=insert_stmt.on_conflict_do_update(index_elements=[contact_tbl.cell],set_={'email':excluded.email},where=update_where_clause)
         await async_session.execute(on_conflict_stmt)
@@ -85,7 +92,7 @@ async def insert_data_into_contact_table(data:dict,session:Session=Depends(get_m
         return False
 
 
-async def insert_data_into_location_table(data:dict,session:Session=Depends(get_master_db_session),async_session:AsyncSession=Depends(get_async_master_db_session)):
+async def insert_data_into_location_table(data:dict,async_session:AsyncSession=Depends(get_async_session)):
     try:
         insert_stmt=postgresql.insert(location_tbl.__tablename__).values(**data)
         on_conflict_stmt=insert_stmt.on_conflict_do_nothing(index_elements=[location_tbl.cell])
@@ -101,7 +108,7 @@ async def insert_data_into_location_table(data:dict,session:Session=Depends(get_
         await async_session.close()
         return False
 
-async def insert_data_into_information_table(data:list,session:Session=Depends(get_master_db_session),async_session:AsyncSession=Depends(get_async_master_db_session)):
+async def insert_data_into_information_table(data:list,async_session:AsyncSession=Depends(get_async_session)):
     try:
         insert_stmt=postgresql.insert(info_tbl.__tablename__).values(**data)
 
@@ -167,5 +174,4 @@ def get_status_tuple(dataList:list,num:int):
     except Exception as e:
         status_data_logger.critical(f"{str(e)}")
         return False
-
 

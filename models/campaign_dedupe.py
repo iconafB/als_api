@@ -1,12 +1,14 @@
 from sqlmodel import SQLModel,Field,Relationship
-from typing import Optional
+from typing import Optional,TYPE_CHECKING
 from models.campaigns_table import campaign_tbl
 
-class campaign_dedupe(SQLModel,table=True):
-    lead_pk:Optional[int]=Field(default=None,primary_key=True)
-    cell:str=Field(default=None,foreign_key="contact_tbl.cell")
-    id:str=Field(default=None,nullable=False)
-    campaign_name:str=Field(default=None,nullable=False)
-    status:str=Field(default=None,nullable=False)
-    code:str=Field(default=None,nullable=False)
-    campaign:Optional[campaign_tbl]=Relationship(back_populates="campaign_dedupes")
+if TYPE_CHECKING:
+    from models.information_table import info_tbl
+class Campaign_Dedupe(SQLModel,table=True):
+    lead_pk:Optional[int]=Field(primary_key=True,index=True) 
+    cell:str=Field(foreign_key="info_tbl.cell",index=True)
+    id:Optional[str]=None
+    campaign_name:Optional[str]=None
+    status:Optional[str]=None
+    code:Optional[str]=None
+    #info_tbl:Optional["info_tbl"]=Relationship(back_populates="campaign_dedupe")

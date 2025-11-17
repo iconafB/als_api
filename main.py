@@ -1,5 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import pytz 
+from contextlib import asynccontextmanager
+
+from apscheduler.schedulers.background import BackgroundScheduler
 from routers.authentication import auth_router
 from routers.campaigns import campaigns_router
 from routers.dnc_routes import dnc_router
@@ -8,15 +12,34 @@ from routers.campaign_rules import campaign_rule_router
 from routers.black_list import black_router
 from routers.pings import ping_router
 from routers.leads_route import leads_router
+from routers.insert_data import insert_data_router
+from routers.practice_rule import practice_rule_router
 from database.database import create_db_and_tables
+from database.master_db_connect import init_db,master_async_engine
 from routers.leads_route import leads_router
+from utils.pings import send_pings_to_dedago,send_pings_to_kuda,send_pings_to_troy,classify_model_type,send_numbers_6am
+
 #from database.database import create_db_and_tables
 
 
-app=FastAPI(title="ALS BACKEND API",
+
+@asynccontextmanager
+async def lifespan(app:FastAPI):
+    await init_db()
+    yield
+    #Engine disposal on shutdown
+    await master_async_engine.dispose()
+
+
+app=FastAPI(lifespan=lifespan,title="ALS BACKEND API",
             description="The ALS API receives the request from frontend to load a list for a specific campaign and ALS checks the data spec that needs to be used for a campaign",
             version="0.2.0"
             )
+
+
+scheduler=BackgroundScheduler(timezone=pytz.timezone("Africa/Johannesburg"))
+
+
 
 #Not best practice you need to filter the correct domain
 
@@ -27,9 +50,25 @@ app.add_middleware(CORSMiddleware,allow_origins=origins,allow_credentials=True,a
 
 #add cors middleware chief
 
-""" @app.on_event("startup")
-def on_start():
-    create_db_and_tables() """
+
+#add shutdown and startup events
+
+# @app.on_event("startup")
+# def start_scheduler():
+
+#     scheduler.add_job(send_numbers_6am,"cron",hour=8,minute=0)
+#     scheduler.add_job(read_kuda_ping,"cron",hour=19,minute=0)
+#     scheduler.add_job(classify_model_type,"cron",hour=20,minute=30)
+#     scheduler.add_job(read_log_7pm,"cron",hour=20,minute=00)
+#     scheduler.add_job(update_extract_date2,"cron",hour=21,minute=45)
+#     return True
+
+# @app.on_event("shutdown")
+# def shutdown_scheduler():
+
+#     return True
+
+
 
 
 @app.get("/")
@@ -46,8 +85,9 @@ app.include_router(campaign_rule_router)
 app.include_router(black_router)
 app.include_router(ping_router)
 app.include_router(leads_router)
+app.include_router(practice_rule_router)
+app.include_router(insert_data_router)
 
-create_db_and_tables()
 
 """ 
 @app.on_event("startup")

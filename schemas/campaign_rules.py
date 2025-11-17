@@ -1,7 +1,5 @@
 from pydantic import BaseModel,Field
-from typing import Optional
-from sqlmodel import SQLModel
-from models.campaign_rules import RulesBase
+from typing import Optional,List
 
 class CreateCampaignRule(BaseModel):
     rule_name:str=Field(default=None,min_length=2,max_length=15)
@@ -14,23 +12,51 @@ class CreateCampaignRule(BaseModel):
     last_used:int
     rule_location:str
 
+class CreateCampaignRuleResponse(BaseModel):
+    rule_code:int
+    rule_name: str 
+    typedata: str
+    status:str
+    age_lower_limit: int 
+    age_upper_limit: int 
+    minimum_salary: int
+    last_used: int 
+    number_of_records: int 
+    gender: Optional[str] 
+    is_dedupe:Optional[bool]=None
+    is_ping_status_null:Optional[bool]=None
+    model_config={
+        "from_attributes":True
+    }
 
-class RuleCreate(SQLModel):
-    rule_name: str = Field(...,max_length=15,min_length=15)
-    typedata: str = Field(default="Status", max_length=50)
-    start_year: int = Field(..., ge=1900, le=2100)
-    end_year: int = Field(..., ge=1900, le=2100)
-    min_salary: Optional[float] = None
-    days_inactive: int = Field(..., ge=0,default=29)
-    record_limit: int = Field(..., ge=1, le=10000)
-    gender: Optional[str] = Field(default=None)
-    @classmethod
-    def validate(cls, values):
-        return RulesBase.validate(values)
+class PaginatedCampaignRules(BaseModel):
+    total:int
+    page:int
+    page_size:int
+    rules:List[CreateCampaignRuleResponse]
 
 
+class RuleCreate(BaseModel):
+    rule_name: str 
+    typedata: str
+    status:str
+    age_lower_limit: int 
+    age_upper_limit: int 
+    minimum_salary: int
+    last_used: int 
+    number_of_records: int 
+    gender: Optional[str] 
+    is_dedupe:Optional[bool]=None
+    is_ping_status_null:Optional[bool]=None
+
+    model_config={
+        "from_attributes":True
+    }
 
 
+    # @classmethod
+    # def validate(cls, values):
+    #     return RulesBase.validate(values)
 
 class RuleSQLColumn(BaseModel):
     salary:Optional[int]=None
@@ -39,6 +65,14 @@ class RuleSQLColumn(BaseModel):
     end_year:Optional[int]=None
     limit:Optional[int]=None
 
+class AssignCampaignRuleToCampaign(BaseModel):
+    rule_code:int
+    camp_code:str
+
+
+class AssignCampaignRuleResponse(BaseModel):
+    message:str
+    Success:bool
 
 class ChangeCampaignResponse(BaseModel):
     rule_code:int
@@ -53,6 +87,14 @@ class CreateDedupeCampaignRule(BaseModel):
     gender:str
     limit:int
     is_deduped:bool=Field(default=True)
+
+class CampaignSpecResponse(BaseModel):
+    Success:bool
+    Number_Of_Leads:int
+
+class ChangeCampaignRuleResponse(BaseModel):
+    Success:bool
+    Message:str
 
 
 

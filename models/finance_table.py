@@ -1,36 +1,35 @@
 from sqlmodel import SQLModel,Field,Relationship
-from typing import Optional
+from typing import Optional,TYPE_CHECKING
 from datetime import datetime
 from sqlalchemy import func
-from models.contact_table import contact_tbl
+
 #Indexes the tables fool
 
+if TYPE_CHECKING:
+    from models.information_table import info_tbl
 class finance_tbl(SQLModel,table=True):
-    cell:str=Field(primary_key=True,default=None,foreign_key="contact_tbl.cell")
-    cipro_reg:bool=Field(nullable=False,default=None)
-    deed_office_reg:bool=Field(nullable=False,default=None)
-    vehicle_owner:bool=Field(nullable=False,default=None)
-    credit_score:float=Field(nullable=False,default=None)
-    monthly_expenditure:float=Field(nullable=False,default=None)
-    owns_credit_card:bool=Field(nullable=False,default=None)
-    owns_st_card:bool=Field(nullable=False,default=None)
-    credit_card_bal:float=Field(nullable=False,default=None)
-    st_card_rem_bal:float=Field(nullable=False,default=None)
-    has_loan_acc:bool=Field(nullable=False,default=None)
-    loan_acc_rem_bal:float=Field(nullable=False,default=None)
-    has_st_loan:float=Field(nullable=False,default=None)
-    st_loan_bal:float=Field(nullable=False,default=None)
-    has1mth_loan_bal:bool=Field(nullable=False,default=None)
-    bal_1mth_load:float=Field(nullable=False,default=None)
-    sti_insurance:bool=Field(nullable=False,default=None)
-    has_sequestration:bool=Field(nullable=False,default=None)
-    has_admin_order:bool=Field(nullable=False,default=None)
-    under_debt_review:bool=Field(nullable=False,default=None)
-    has_judgements:bool=Field(nullable=False,default=None)
-    bank:str=Field(nullable=False,default=None)
-    bal:float=Field(nullable=False,default=None)
-    
-    contact:Optional[contact_tbl]=Relationship(back_populates="finance_tbl")
 
-
-
+    cell:str=Field(primary_key=True,foreign_key="info_tbl.cell")
+    cipro_reg:Optional[bool]=None
+    deed_office_reg:Optional[bool]=None
+    vehicle_owner:Optional[bool]=None
+    credit_score:Optional[float]=None
+    monthly_expenditure:Optional[float]=None
+    owns_credit_card:Optional[bool]=None
+    owns_st_card:Optional[bool]=None
+    credit_card_bal:Optional[float]=None
+    st_card_rem_bal:Optional[float]=None
+    has_loan_acc:Optional[bool]=None
+    loan_acc_rem_bal:Optional[float]=None
+    has_st_loan:Optional[float]=None
+    st_loan_bal:Optional[float]=None
+    has1mth_loan_bal:Optional[bool]=None
+    bal_1mth_load:Optional[float]=None
+    sti_insurance:Optional[bool]=None
+    has_sequestration:Optional[bool]=None
+    has_admin_order:Optional[bool]=None
+    under_debt_review:Optional[bool]=None
+    has_judgements:Optional[bool]=None
+    bank:Optional[str]=None
+    bal:Optional[float]=None
+    #info_tbl:Optional["info_tbl"]=Relationship(back_populates="finance_tbl")

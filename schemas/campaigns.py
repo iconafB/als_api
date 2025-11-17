@@ -1,44 +1,43 @@
-from sqlmodel import SQLModel,Field
 from pydantic import BaseModel
-from datetime import date
+from typing import List
 
-class CreateCampaign(SQLModel):
-    branch:str=Field(min_length=1,max_length=50)
-    camp_code:str=Field(min_length=1,max_length=100)
-    campaign_name:str=Field(min_length=1,max_length=100)
-
-class CreateCampaignResponse(SQLModel):
-    id:int
-    camp_code:str=Field(min_length=1,max_length=100)
-    campaing_name:str=Field(min_length=1,max_length=100)
-    branch:str=Field(min_length=1,max_length=50)
+class CreateCampaignResponse(BaseModel):
+    camp_code:str
+    campaign_name:str
+    branch:str
+    model_config={
+        "from_attributes":True
+    }
 
 
-class CreateCampaignResponseMeassage(SQLModel):
-    success:bool
-    message:str
+class PaginatedCampaigResponse(BaseModel):
+    total:int
+    page:int
+    page_size:int
+    results:List[CreateCampaignResponse]
+
+    
+class CreateCampaign(BaseModel):
+    branch:str
+    camp_code:str
+    campaign_name:str
+
+
+
+class GetCampaignResponse(CreateCampaignResponse):
+    pass
 
 class LoadCampaign(BaseModel):
     branch:str
     camp_code:str
 
-class CampaignSpec(SQLModel):
+class UpdateCampaignName(BaseModel):
+    campaign_name:str
+class CampaignSpec(BaseModel):
     id_number:str
     fore_name:str
     last_name:str
     cell_number:str
-
-class LoadCampaignSchemas(BaseModel):
-    branch:str
-    min_salary:int
-    max_salary:int
-    min_dob_year:str
-    max_dob_year:str
-    min_age:int
-    max_age:int
-    days_last_used:int
-    limit:int
-
 
 class LoadCampaignResponse(BaseModel):
     campaign_code:str
@@ -50,8 +49,3 @@ class LoadCampaignResponse(BaseModel):
     load_dmasa_status:str
     number_of_leads_submitted:int
 
-
-class CreateCampaign(BaseModel):
-    branch:str
-    camp_name:str
-    camp_code:str

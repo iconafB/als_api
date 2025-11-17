@@ -58,6 +58,17 @@ class Settings(BaseSettings):
     read_dmasa_dedupe_status:str
     read_dmasa_output_url:str
     notification_email:str
+
+    #mail server 
+    MAIL_USERNAME:str
+    MAIL_PASSWORD:str
+    MAIL_FROM:str
+    MAIL_PORT:int
+    MAIL_SERVER:str
+    MAIL_FROM_NAME:str
+    MAIL_TLS:bool
+    MAIL_SSL:bool
+    USER_CREDENTIALS:bool
     
     #load the environment variables file
     model_config=SettingsConfigDict(env_file=".env")
@@ -65,7 +76,6 @@ class Settings(BaseSettings):
 #cache the settings results
 @lru_cache
 def get_settings()->Settings:
-    
     return Settings()
 
 

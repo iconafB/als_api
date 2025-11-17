@@ -2,13 +2,14 @@ from sqlmodel import SQLModel,Field,Relationship
 from models.information_table import info_tbl
 from typing import Optional
 class location_tbl(SQLModel,table=True):
-    cell:str=Field(primary_key=True,default=None,foreign_key="info_tbl.cell")
-    line_one:str=Field(default=None,nullable=False)
-    line_two:str=Field(default=None,nullable=False)
-    line_three:str=Field(default=None,nullable=False)
-    line_four:str=Field(default=None,nullable=False)
-    postal_code:str=Field(default=None,nullable=False)
-    province:str=Field(default=None,nullable=False)
-    surburb:str=Field(default=None,nullable=False)
-    city:str=Field(default=None,nullable=False)
-    info:Optional[info_tbl]=Relationship(back_populates="locations")
+    cell:str=Field(primary_key=True,foreign_key="info_tbl.cell")
+    line_one:Optional[str]=None
+    line_two:Optional[str]=None
+    line_three:Optional[str]=None
+    line_four:Optional[str]=None
+    postal_code:Optional[str]=None
+    province:Optional[str]=None
+    surburb:Optional[str]=None
+    city:Optional[str]=None
+    
+    #info:Optional[info_tbl]=Relationship(back_populates="location_tbl")

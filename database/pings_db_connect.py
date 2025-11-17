@@ -6,7 +6,8 @@ PINGS_DATABASE_URL=f"postgresql+psycopg2://{get_settings().pings_db_name}:{get_s
 
 #create the connection engine for pings database
 
-pings_engine=create_engine(PINGS_DATABASE_URL,echo=True)
+pings_engine=create_engine(PINGS_DATABASE_URL,echo=False)
+
 
 def get_pings_session_db():
     with Session(pings_engine) as pings_db_session:

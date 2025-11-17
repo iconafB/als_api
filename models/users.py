@@ -14,4 +14,18 @@ class users_table(SQLModel,table=True):
     is_active:bool=Field(default=None,nullable=False)
     created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
 
+class reset_tokens(SQLModel,table=True):
+    id:Optional[int]=Field(primary_key=True,default=None)
+    user_id:int=Field(foreign_key="users_table.id",index=True)
+    token_hash:str
+    created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
+    expires_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
+    used_at:Optional[datetime]=None
+    request_ip:Optional[str]=None
+    user_agent:Optional[str]=None
+    
+
+
+
+
 

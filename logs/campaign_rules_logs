@@ -29,3 +29,198 @@
 2025-10-22 16:56:36,936 - als campaign rules - ERROR - 400: start year cannot be greater than the end year
 2025-10-22 16:56:51,442 - als campaign rules - INFO - campaign created:UNGGDFA
 2025-10-22 16:59:00,165 - als campaign rules - INFO - campaign rule created:UNGGDFe
+2025-11-12 15:13:53,818 - als campaign rules - INFO - campaign rule:Dance requested by user 3 with email:tim@gmail.com does not exist
+2025-11-12 15:13:53,818 - als campaign rules - INFO - campaign rule:Dance requested by user 3 with email:tim@gmail.com does not exist
+2025-11-12 15:13:53,818 - als campaign rules - INFO - campaign rule:Dance requested by user 3 with email:tim@gmail.com does not exist
+2025-11-12 15:21:08,078 - als campaign rules - INFO - campaign rule:DANCE requested by user 3 with email:tim@gmail.com does not exist
+2025-11-12 15:21:08,078 - als campaign rules - INFO - campaign rule:DANCE requested by user 3 with email:tim@gmail.com does not exist
+2025-11-12 15:21:08,078 - als campaign rules - INFO - campaign rule:DANCE requested by user 3 with email:tim@gmail.com does not exist
+2025-11-12 15:21:08,132 - als campaign rules - ERROR - user id:3 with email:tim@gmail.com created a campaign rule:DANCE and exception:BaseModel.__init__() takes 1 positional argument but 2 were given
+Traceback (most recent call last):
+  File "C:\Users\iconaf\Documents\als_folder\als_backend_api\crud\campaign_rules.py", line 35, in create_campaign_rule_db
+    return CreateCampaignRuleResponse(db_rule)
+TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+2025-11-12 15:21:08,132 - als campaign rules - ERROR - user id:3 with email:tim@gmail.com created a campaign rule:DANCE and exception:BaseModel.__init__() takes 1 positional argument but 2 were given
+Traceback (most recent call last):
+  File "C:\Users\iconaf\Documents\als_folder\als_backend_api\crud\campaign_rules.py", line 35, in create_campaign_rule_db
+    return CreateCampaignRuleResponse(db_rule)
+TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+2025-11-12 15:21:08,132 - als campaign rules - ERROR - user id:3 with email:tim@gmail.com created a campaign rule:DANCE and exception:BaseModel.__init__() takes 1 positional argument but 2 were given
+Traceback (most recent call last):
+  File "C:\Users\iconaf\Documents\als_folder\als_backend_api\crud\campaign_rules.py", line 35, in create_campaign_rule_db
+    return CreateCampaignRuleResponse(db_rule)
+TypeError: BaseModel.__init__() takes 1 positional argument but 2 were given
+2025-11-12 15:23:49,429 - als campaign rules - INFO - user 3 with email tim@gmail.com tried to create campaign rule with rule name:DANCE
+2025-11-12 15:23:49,429 - als campaign rules - INFO - user 3 with email tim@gmail.com tried to create campaign rule with rule name:DANCE
+2025-11-12 15:23:49,429 - als campaign rules - INFO - user 3 with email tim@gmail.com tried to create campaign rule with rule name:DANCE
+2025-11-12 15:25:36,476 - als campaign rules - INFO - campaign rule:DANCA requested by user 3 with email:tim@gmail.com does not exist
+2025-11-12 15:25:36,476 - als campaign rules - INFO - campaign rule:DANCA requested by user 3 with email:tim@gmail.com does not exist
+2025-11-12 15:25:36,476 - als campaign rules - INFO - campaign rule:DANCA requested by user 3 with email:tim@gmail.com does not exist
+2025-11-12 15:25:36,495 - als campaign rules - ERROR - user id:3 with email:tim@gmail.com created a campaign rule:DANCA and exception:1 validation error for CreateCampaignRuleResponse
+number_of_leads
+  Field required [type=missing, input_value=rules_tbl(rule_name='DANC...EMALE', is_active=False), input_type=rules_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+Traceback (most recent call last):
+  File "C:\Users\iconaf\Documents\als_folder\als_backend_api\crud\campaign_rules.py", line 35, in create_campaign_rule_db
+    return CreateCampaignRuleResponse.model_validate(db_rule)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\iconaf\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\main.py", line 716, in model_validate
+    return cls.__pydantic_validator__.validate_python(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        obj,
+        ^^^^
+    ...<5 lines>...
+        by_name=by_name,
+        ^^^^^^^^^^^^^^^^
+    )
+    ^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for CreateCampaignRuleResponse
+number_of_leads
+  Field required [type=missing, input_value=rules_tbl(rule_name='DANC...EMALE', is_active=False), input_type=rules_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+2025-11-12 15:25:36,495 - als campaign rules - ERROR - user id:3 with email:tim@gmail.com created a campaign rule:DANCA and exception:1 validation error for CreateCampaignRuleResponse
+number_of_leads
+  Field required [type=missing, input_value=rules_tbl(rule_name='DANC...EMALE', is_active=False), input_type=rules_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+Traceback (most recent call last):
+  File "C:\Users\iconaf\Documents\als_folder\als_backend_api\crud\campaign_rules.py", line 35, in create_campaign_rule_db
+    return CreateCampaignRuleResponse.model_validate(db_rule)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\iconaf\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\main.py", line 716, in model_validate
+    return cls.__pydantic_validator__.validate_python(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        obj,
+        ^^^^
+    ...<5 lines>...
+        by_name=by_name,
+        ^^^^^^^^^^^^^^^^
+    )
+    ^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for CreateCampaignRuleResponse
+number_of_leads
+  Field required [type=missing, input_value=rules_tbl(rule_name='DANC...EMALE', is_active=False), input_type=rules_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+2025-11-12 15:25:36,495 - als campaign rules - ERROR - user id:3 with email:tim@gmail.com created a campaign rule:DANCA and exception:1 validation error for CreateCampaignRuleResponse
+number_of_leads
+  Field required [type=missing, input_value=rules_tbl(rule_name='DANC...EMALE', is_active=False), input_type=rules_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+Traceback (most recent call last):
+  File "C:\Users\iconaf\Documents\als_folder\als_backend_api\crud\campaign_rules.py", line 35, in create_campaign_rule_db
+    return CreateCampaignRuleResponse.model_validate(db_rule)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\iconaf\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\main.py", line 716, in model_validate
+    return cls.__pydantic_validator__.validate_python(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        obj,
+        ^^^^
+    ...<5 lines>...
+        by_name=by_name,
+        ^^^^^^^^^^^^^^^^
+    )
+    ^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for CreateCampaignRuleResponse
+number_of_leads
+  Field required [type=missing, input_value=rules_tbl(rule_name='DANC...EMALE', is_active=False), input_type=rules_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+2025-11-12 15:27:08,775 - als campaign rules - ERROR - an internal server error occurred while requesting campaign rule:DANCA,1 validation error for CreateCampaignRuleResponse
+number_of_leads
+  Field required [type=missing, input_value=rules_tbl(rule_name='DANC...EMALE', is_active=False), input_type=rules_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+Traceback (most recent call last):
+  File "C:\Users\iconaf\Documents\als_folder\als_backend_api\crud\campaign_rules.py", line 161, in get_campaign_rule_by_rule_name
+    return CreateCampaignRuleResponse.model_validate(campaign_rule)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "C:\Users\iconaf\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\main.py", line 716, in model_validate
+    return cls.__pydantic_validator__.validate_python(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        obj,
+        ^^^^
+    ...<5 lines>...
+        by_name=by_name,
+        ^^^^^^^^^^^^^^^^
+    )
+    ^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for CreateCampaignRuleResponse
+number_of_leads
+  Field required [type=missing, input_value=rules_tbl(rule_name='DANC...EMALE', is_active=False), input_type=rules_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+2025-11-12 15:27:08,775 - als campaign rules - ERROR - an internal server error occurred while requesting campaign rule:DANCA,1 validation error for CreateCampaignRuleResponse
+number_of_leads
+  Field required [type=missing, input_value=rules_tbl(rule_name='DANC...EMALE', is_active=False), input_type=rules_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+Traceback (most recent call last):
+  File "C:\Users\iconaf\Documents\als_folder\als_backend_api\crud\campaign_rules.py", line 161, in get_campaign_rule_by_rule_name
+    return CreateCampaignRuleResponse.model_validate(campaign_rule)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "C:\Users\iconaf\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\main.py", line 716, in model_validate
+    return cls.__pydantic_validator__.validate_python(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        obj,
+        ^^^^
+    ...<5 lines>...
+        by_name=by_name,
+        ^^^^^^^^^^^^^^^^
+    )
+    ^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for CreateCampaignRuleResponse
+number_of_leads
+  Field required [type=missing, input_value=rules_tbl(rule_name='DANC...EMALE', is_active=False), input_type=rules_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+2025-11-12 15:27:08,775 - als campaign rules - ERROR - an internal server error occurred while requesting campaign rule:DANCA,1 validation error for CreateCampaignRuleResponse
+number_of_leads
+  Field required [type=missing, input_value=rules_tbl(rule_name='DANC...EMALE', is_active=False), input_type=rules_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+Traceback (most recent call last):
+  File "C:\Users\iconaf\Documents\als_folder\als_backend_api\crud\campaign_rules.py", line 161, in get_campaign_rule_by_rule_name
+    return CreateCampaignRuleResponse.model_validate(campaign_rule)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "C:\Users\iconaf\AppData\Local\Programs\Python\Python313\Lib\site-packages\pydantic\main.py", line 716, in model_validate
+    return cls.__pydantic_validator__.validate_python(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        obj,
+        ^^^^
+    ...<5 lines>...
+        by_name=by_name,
+        ^^^^^^^^^^^^^^^^
+    )
+    ^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for CreateCampaignRuleResponse
+number_of_leads
+  Field required [type=missing, input_value=rules_tbl(rule_name='DANC...EMALE', is_active=False), input_type=rules_tbl]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+2025-11-12 15:30:30,208 - als campaign rules - INFO - user 3 with email tim@gmail.com tried to create campaign rule with rule name:DANCE
+2025-11-12 15:30:30,208 - als campaign rules - INFO - user 3 with email tim@gmail.com tried to create campaign rule with rule name:DANCE
+2025-11-12 15:30:30,208 - als campaign rules - INFO - user 3 with email tim@gmail.com tried to create campaign rule with rule name:DANCE
+2025-11-12 15:31:14,063 - als campaign rules - INFO - campaign rule:DANCE2 requested by user 3 with email:tim@gmail.com does not exist
+2025-11-12 15:31:14,063 - als campaign rules - INFO - campaign rule:DANCE2 requested by user 3 with email:tim@gmail.com does not exist
+2025-11-12 15:31:14,063 - als campaign rules - INFO - campaign rule:DANCE2 requested by user 3 with email:tim@gmail.com does not exist
+2025-11-12 15:32:48,276 - als campaign rules - INFO - campaign rule:DANCE4 requested by user 3 with email:tim@gmail.com does not exist
+2025-11-12 15:32:48,276 - als campaign rules - INFO - campaign rule:DANCE4 requested by user 3 with email:tim@gmail.com does not exist
+2025-11-12 15:32:48,276 - als campaign rules - INFO - campaign rule:DANCE4 requested by user 3 with email:tim@gmail.com does not exist
+2025-11-12 15:32:48,284 - als campaign rules - INFO - user 3 with email:tim@gmail.com created campaign rule:DANCE4
+2025-11-12 15:32:48,284 - als campaign rules - INFO - user 3 with email:tim@gmail.com created campaign rule:DANCE4
+2025-11-12 15:32:48,284 - als campaign rules - INFO - user 3 with email:tim@gmail.com created campaign rule:DANCE4
+2025-11-12 15:33:25,001 - als campaign rules - INFO - campaign rule:DANCE5 requested by user 3 with email:tim@gmail.com does not exist
+2025-11-12 15:33:25,001 - als campaign rules - INFO - campaign rule:DANCE5 requested by user 3 with email:tim@gmail.com does not exist
+2025-11-12 15:33:25,001 - als campaign rules - INFO - campaign rule:DANCE5 requested by user 3 with email:tim@gmail.com does not exist
+2025-11-12 15:33:25,007 - als campaign rules - INFO - user 3 with email:tim@gmail.com created campaign rule:DANCE5
+2025-11-12 15:33:25,007 - als campaign rules - INFO - user 3 with email:tim@gmail.com created campaign rule:DANCE5
+2025-11-12 15:33:25,007 - als campaign rules - INFO - user 3 with email:tim@gmail.com created campaign rule:DANCE5
+2025-11-12 15:35:01,397 - als campaign rules - INFO - campaign rule:DANCE7 requested by user 3 with email:tim@gmail.com does not exist
+2025-11-12 15:35:01,397 - als campaign rules - INFO - campaign rule:DANCE7 requested by user 3 with email:tim@gmail.com does not exist
+2025-11-12 15:35:01,397 - als campaign rules - INFO - campaign rule:DANCE7 requested by user 3 with email:tim@gmail.com does not exist
+2025-11-12 15:35:01,402 - als campaign rules - INFO - user 3 with email:tim@gmail.com created campaign rule:DANCE7
+2025-11-12 15:35:01,402 - als campaign rules - INFO - user 3 with email:tim@gmail.com created campaign rule:DANCE7
+2025-11-12 15:35:01,402 - als campaign rules - INFO - user 3 with email:tim@gmail.com created campaign rule:DANCE7
+2025-11-12 16:43:34,622 - als campaign rules - INFO - user:3 with email:tim@gmail.com retrieved records for campaign rules:6
+2025-11-12 16:43:34,622 - als campaign rules - INFO - user:3 with email:tim@gmail.com retrieved records for campaign rules:6
+2025-11-12 16:43:34,622 - als campaign rules - INFO - user:3 with email:tim@gmail.com retrieved records for campaign rules:6
+2025-11-12 16:43:49,082 - als campaign rules - INFO - user:3 with email:tim@gmail.com retrieved records for campaign rules:6
+2025-11-12 16:43:49,082 - als campaign rules - INFO - user:3 with email:tim@gmail.com retrieved records for campaign rules:6
+2025-11-12 16:43:49,082 - als campaign rules - INFO - user:3 with email:tim@gmail.com retrieved records for campaign rules:6
+2025-11-12 16:44:41,302 - als campaign rules - INFO - user:3 with email:tim@gmail.com retrieved records for campaign rules:6
+2025-11-12 16:44:41,302 - als campaign rules - INFO - user:3 with email:tim@gmail.com retrieved records for campaign rules:6
+2025-11-12 16:44:41,302 - als campaign rules - INFO - user:3 with email:tim@gmail.com retrieved records for campaign rules:6
+2025-11-12 16:53:57,305 - als campaign rules - INFO - user:3 with email:tim@gmail.com retrieved records for campaign rules:6
+2025-11-12 16:53:57,305 - als campaign rules - INFO - user:3 with email:tim@gmail.com retrieved records for campaign rules:6
+2025-11-12 16:53:57,305 - als campaign rules - INFO - user:3 with email:tim@gmail.com retrieved records for campaign rules:6

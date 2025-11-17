@@ -8,28 +8,121 @@ from settings.Settings import get_settings
 import pandas as pd
 from utils.logger import define_logger
 from database.pings_db_connect import get_pings_session_db   
+import csv
 
 PING_URL="https://ss.dedago.com/api/iconping"
-
-
 
 PING_HEADER={"content-type": "application/json"}
 
 pings_logger=define_logger("als pings logs","logs/pings.log")
+
+def convert_numbers_to_csv(numbers_to_ping: list, dir: str, file_name: str) -> None:
+    series = pd.Series(numbers_to_ping, name="telnr")
+    os.makedirs(dir, exist_ok=True)
+    file_path = os.path.join(dir, file_name)
+    series.to_csv(file_path, index=False, header=True)
+
+
+
+def process_numbers(numbersToPing):
+    # Ensure the list never exceeds 300,000 elements
+    print('FIRST = ', len(numbersToPing))
+    if len(numbersToPing) > 300000:
+        numbersToPing = numbersToPing[:300000]
+
+    print('SECOND = ', len(numbersToPing))
+    # Determine the split point
+    midpoint = len(numbersToPing) // 2
+    send_pings_kuda(numbersToPing[:midpoint])  # First 150K to kuda()
+    today_date = datetime.today().strftime("%Y-%m-%d")
+
+    file_name = today_date + ".csv"
+    convert_numbers_to_csv(numbersToPing[:midpoint], "kuda_ping_data/", file_name)
+    convert_numbers_to_csv(numbersToPing[midpoint:], "troy_ping_data/", file_name)  # change directory name
+
+    send_pings_troy("troy_ping_data/", file_name)
+
+    slack.Logs(
+        f"Splitting: Sending first {midpoint} to kuda() and the rest {midpoint} to troy()").slack_message()
+
+    print(f"Splitting: Sending first {midpoint} to kuda() and the rest {midpoint} to troy()")
+
+
+def filter_numbers(totalnumbers, totaldblist):
+    """
+    Filters totalnumbers to return only the tuples where element[0] (cell number) exists in totaldblist.
+
+    :param totalnumbers: List of tuples, where element[0] is the cell number.
+    :param totaldblist: List containing the cell numbers to filter by.
+    :return: Filtered list of tuples.
+    """
+    db_set = set(totaldblist)  # Convert list to set for faster lookups
+    print('DB SET = ', len(db_set))
+    print('TXT SET = ', len(totalnumbers))
+    return [tup for tup in totalnumbers if tup[0] in db_set]
+
+
+def get_list_from_file(file_path: str):
+    # file_path = "C:/Users/Administrator/Desktop/Ping_Origin/troy_ping_data/2025-03-20.csv"
+
+    # Read the CSV file and store numbers in a list
+    telnr_list = []
+    with open(file_path, mode="r", newline="") as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            telnr_list.append(row["telnr"])
+
+    return telnr_list
+
+
+def fetch_data(read_stmt,session:Session):
+    # Database connection parameters
+    db_params = {
+        'dbname': 'postgres',
+        'user': 'postgres',
+        'password': 'new2025_strong_password20@676',
+        'host': '102.211.29.157',
+        'port': 5433
+    }
+
+    try:
+        # Establish connection
+        conn = psycopg2.connect(**db_params)
+        cursor = conn.cursor()
+
+        # Execute the provided SQL query
+        cursor.execute(read_stmt)
+
+        # Fetch all rows
+        rows = cursor.fetchall()
+
+        # Print the results
+        list_to_send = []
+        for row in rows:
+            # print(row)
+            list_to_send.append(row[0])
+
+        # Close cursor and connection
+        cursor.close()
+        conn.close()
+
+    except Exception as e:
+        print(f"Error with fetching data TO ping: {e}")
+
+    if len(list_to_send) > 0:
+        return list_to_send
+    else:
+        return 'No numbers avails to send'
 
 
 def send_pings_to_dedago(list_numbers:None):
     try:
         timestamp=datetime.now().strftime("%Y-%m-%d,%H:%M:%S")
         payload={"datetostart":timestamp,"numbers":list_numbers}
-
         if not list_numbers:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="No numbers uploaded for ping service")
-       
         dedago_response=requests('POST',url=PING_URL,data=json.dumps(payload),timeout=700)
-        
         return dedago_response
-    
     except Exception as e:
         pings_logger.exception(f"an exception occurred while sending pings to dedago:{e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"{e}")
@@ -81,12 +174,10 @@ def send_pings_to_kuda(records:None):
                         return {"message":"Error with Kuda's Ping Service"}
                     
                 return {"message":f"{records}"}
-            
     except Exception as e:
         pings_logger.critical(f"{str(e)}")
 
         return {"error_message":f"{str(e)}"}
-    
 
 #send pings to troy
 
@@ -97,6 +188,7 @@ def send_pings_to_troy(dir:str,filename:str):
         #raise an error if the file is read again
 
         df=pd.read_csv(file_path)
+
         pings_length=len(df)
 
         batch_name=filename.split(".")[0]
@@ -124,7 +216,7 @@ def send_pings_to_troy(dir:str,filename:str):
     except Exception as e:
         pings_logger.critical(f"f{str(e)}")
         return {"message":f"{str(e)}"}
-    
+
 
 def classify_model_type(session:Session=Depends(get_pings_session_db)):
     try:
@@ -154,3 +246,5 @@ def classify_model_type(session:Session=Depends(get_pings_session_db)):
         return {"error_message":f"{str(e)}"}
     
 
+def send_numbers_6am():
+    return True

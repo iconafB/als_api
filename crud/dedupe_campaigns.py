@@ -46,6 +46,7 @@ async def deactivate_deduped_campaign(camp_code:str,session:AsyncSession):
 async def get_deduped_campaign(camp_code:str,session:AsyncSession):
     
     result=await session.exec(select(dedupe_campaigns_tbl).where(dedupe_campaigns_tbl.camp_code==camp_code))
+    
     db_item=result.one_or_none()
     if not db_item:
         return None
@@ -437,9 +438,13 @@ async def bulk_insert_campaign_dedupe_tbl_in_batches():
 async def select_code_from_campaign_dedupe_table(session:AsyncSession,code:str)->str | None:
 
     sql_query = text("SELECT code FROM campaign_dedupe WHERE code = :code")
+
     result=await session.execute(sql_query,{"code":code})
+
     row=result.fetchone()
     return row[0] if row else None
+
+
 
 #campaigns rule where clause builder to query the campaigns correctly
 

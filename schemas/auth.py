@@ -24,6 +24,10 @@ class ForgotPassword(BaseModel):
     email:EmailStr
     new_password:str
 
+class ForgotPasswordRequest(BaseModel):
+    email:EmailStr
+
+
 class LoginUser(BaseModel):
     email:EmailStr
     password:str

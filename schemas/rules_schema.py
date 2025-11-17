@@ -1,0 +1,259 @@
+from fastapi import HTTPException,status
+from typing import Optional,Any,Literal,Dict,Union
+from pydantic import BaseModel,model_validator,ValidationError,Field as PydField,field_validator
+from enum import Enum
+
+
+class Operator(str,Enum):
+    equal="equal"
+    not_equal="not_equal"
+    less_than="less_than"
+    greater_than="greater_than"
+    between="between"
+
+
+ #lower' and 'upper' must not be provided for operator 'equal'
+
+class NumericCondition(BaseModel):
+
+    operator: Literal[
+        "equal", "not_equal",
+        "less_than", "less_than_equal",
+        "greater_than", "greater_than_equal",
+        "between"
+    ]
+    
+    value: Optional[float] = None
+    lower: Optional[float] = None
+    upper: Optional[float] = None
+    @model_validator(mode="before")
+    def validate_numeric_condition(cls, values):
+        op = values.get("operator")
+        value = values.get("value")
+        lower = values.get("lower")
+        upper = values.get("upper")
+        if op == "between":
+            if lower is None or upper is None:
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,detail=f"Operator requires both lower and upper values")
+            if upper < lower:
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,detail="upper must be greater than or equal to lower")
+            if value!=0 and op == 'between':
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,detail="'value' must not be provided when using 'between'.")
+            
+        elif op in ["less_than","less_than_equal"]:
+            if upper is None:
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,detail=f"Operator '{op}' requires 'upper'")
+            
+        elif op in ["greater_than", "greater_than_equal"]:
+            if lower is None:
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,detail=f"Operator '{op}' requires 'lower'")
+        else:
+            if value is None:
+               raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,detail=f"Unknown operator '{op}'")
+        return values
+
+
+#checked
+class LastUsedCondition(BaseModel):
+    operator:Literal["less_than","less_than_equal","equal"]
+    value:int
+    @model_validator(mode="before")
+    def validate_value_type(cls, values):
+        value = values.get("value")
+        if not isinstance(value, int):
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,detail=f"Invalid type for 'value'. Expected 'int', got '{type(value).__name__}'.")
+        return values
+
+#checked
+class TypeDataCondition(BaseModel):
+    operator: Literal["equal","not_equal"]
+    value: Literal["Status","Enriched","None"]
+    @model_validator(mode="before")
+    def validate_typedata(cls, values):
+        # Allowed keys
+        allowed_keys = {"operator", "value"}
+        extra_keys = set(values.keys()) - allowed_keys
+        if extra_keys:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,detail=f"Unexpected fields for TypeDataCondition: {extra_keys}. Only 'operator' and 'value' are allowed.")
+        # Validate value case-insensitively
+        value = values.get("value")
+        if value is None:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,detail="Value must be provided for TypeDataCondition.")
+
+        allowed_values = {"STATUS", "ENRICHED", "NONE"}
+        if value.upper() not in allowed_values:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,detail=f"Invalid value '{value}' for TypeDataCondition. Must be one of 'Status', 'Enriched', 'None'.")
+
+        # Normalize value to canonical format (optional)
+        values["value"] = value.capitalize() if value.upper() != "NONE" else "None"
+        return values
+
+
+#checked
+class GenderCondition(BaseModel):
+    operator: Literal["equal","not_equal"]
+    value: Literal["MALE","FEMALE","NULL"]
+    @model_validator(mode="before")
+    def validate_gender(cls,values):
+        #Allowed keys
+        allowed_keys={"operator","value"}
+        #check for extra keys on the payload
+        extra_keys = set(values.keys()) - allowed_keys
+
+        if extra_keys:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Unexpected fields for gender condition: {extra_keys}. Only 'operator' and 'value' are allowed."
+            )
+         # Validate that value is one of allowed literals
+
+        value = values.get("value")
+
+        if value not in {"MALE", "FEMALE", "NULL"}:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid value '{value}' for gender condition. Must be one of 'MALE', 'FEMALE', 'NULL'."
+            )
+
+        return values
+
+#checked
+class IsActiveCondition(BaseModel):
+    operator: Literal["equal"]
+    value: Literal[True]
+
+
+class AgeCondition(BaseModel):
+
+    operator: Literal[
+        "equal", "less_than", "less_than_equal",
+        "greater_than", "greater_than_equal", "between"
+    ]
+    value: Optional[int] = None
+    lower: Optional[int] = None
+    upper: Optional[int] = None
+
+    @model_validator(mode="before")
+    def check_age_range(cls, values):
+        
+        op = values.get("operator")
+        value = values.get("value")
+        lower = values.get("lower")
+        upper = values.get("upper")
+
+        if op == "between":
+            if lower is None or upper is None:
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,detail="Both lower and upper must be provided for 'between'")
+            if upper < lower:
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,detail="Age upper must be >= lower")
+            if value is not None:
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,detail="'value' must not be provided for 'between'")
+            
+        elif op in ["less_than", "less_than_equal"]:
+            if upper is None:
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,detail=f"Age Condition '{op}' requires 'upper'")
+        elif op in ["greater_than", "greater_than_equal"]:
+            if upper is None:
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,detail=f"Age Condition '{op}' requires 'upper'")
+            
+        elif op in ["equal", "not_equal"]:
+            if value is None:
+                raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,detail=f"Age Condition '{op}' requires 'value'")   
+        else:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,detail=f"Unknown operator '{op}'")
+        return values
+
+
+class RuleSchema(BaseModel):
+    pinged_data:bool
+    salary:NumericCondition
+    gender:GenderCondition
+    typedata:TypeDataCondition
+    is_active:IsActiveCondition
+    age:AgeCondition
+    derived_income:NumericCondition
+    is_deduped:bool
+    last_used:Optional[LastUsedCondition]=None
+    
+
+class NumericConditionResponse(BaseModel):
+    operator: str
+    value: Optional[float] = None
+    lower: Optional[float] = None
+    upper: Optional[float] = None
+
+    @classmethod
+    def from_condition(cls, condition: dict):
+        if condition["operator"] == "between":
+            return cls(operator=condition["operator"], lower=condition.get("lower"), upper=condition.get("upper"))
+        else:
+            return cls(operator=condition["operator"], value=condition.get("value"))
+
+
+# Flattened Age response
+class AgeConditionResponse(BaseModel):
+    operator: str
+    value: Optional[int] = None
+    lower: Optional[int] = None
+    upper: Optional[int] = None
+
+    @classmethod
+    def from_condition(cls, condition: dict):
+        if condition["operator"] == "between":
+            return cls(operator=condition["operator"], lower=condition.get("lower"), upper=condition.get("upper"))
+        else:
+            return cls(operator=condition["operator"], value=condition.get("value"))
+
+
+class LastUsedConditionResponse(BaseModel):
+    value: int
+    @classmethod
+    def from_condition(cls, condition: dict):
+        return cls(value=condition.get("value"))
+
+# Top-level response model
+class RuleResponseModel(BaseModel):
+    status: str
+    id: int
+    name: str
+    salary: NumericConditionResponse
+    derived_income: NumericConditionResponse
+    gender: str
+    typedata: str
+    is_active: bool
+    age: AgeConditionResponse
+    last_used: Optional[LastUsedConditionResponse] = None
+
+
+
+
+
+#Request schema for rule creation
+
+class CreateRule(BaseModel):
+    name:bool
+    status:bool
+    definition:RuleSchema
+
+
+class ResponseRuleSchema(BaseModel):
+    id:int
+    name:str
+    status:bool
+    definition:RuleSchema
+    class Config:
+        from_attributes=True
+
+
+
+class ComparisonRule(BaseModel):
+    operator:str
+    value:Optional[Any]=None
+    lower:Optional[Any]=None
+    upper:Optional[Any]=None
+
+class GenderRule(BaseModel):
+    operator:Literal["equal"]
+    value:Literal["MALE","FEMALE","NULL"]
+
+

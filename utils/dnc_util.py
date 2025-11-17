@@ -52,6 +52,7 @@ def send_dnc_list_to_db(dnc_list:list,camp_code:str):
         count=0
 
         for number in dnc_list:
+
             sql_select_query=f"select Number from {camp_code}_dnc where Number={number}"
             cursor=mysqldb_connection.cursor(buffered=True)
             cursor.execute(sql_select_query)
