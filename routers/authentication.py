@@ -25,9 +25,7 @@ async def register_user(req:Request,user:RegisterUser,session:AsyncSession=Depen
 
 @auth_router.post("/login",status_code=status.HTTP_200_OK,response_model=Token,description="Login to the als by providing a password and email")
 async def login_user(user:Annotated[OAuth2PasswordRequestForm,Depends()],session:AsyncSession=Depends(get_async_session)):
-    
     login_query=select(users_table).where(users_table.email==user.username)
-    
     result=await session.execute(login_query)
     login_user=result.scalar_one_or_none()
     if login_user is None:
@@ -45,7 +43,6 @@ async def login_user(user:Annotated[OAuth2PasswordRequestForm,Depends()],session
     access_token_expires=timedelta(minutes=get_settings().ACCESS_TOKEN_EXPIRES_MINUTES)
     #generate the access token
     token=create_access_token(data={'user_id':login_user.id},expires_delta=access_token_expires)
-    print(f"print the user id:{login_user.id}")
     #return the token
     auth_logger.info(f"username:{user.username} successfully logged in")
     return Token(access_token=token,token_type='Bearer')

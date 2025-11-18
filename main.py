@@ -2,7 +2,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import pytz 
 from contextlib import asynccontextmanager
-
 from apscheduler.schedulers.background import BackgroundScheduler
 from routers.authentication import auth_router
 from routers.campaigns import campaigns_router

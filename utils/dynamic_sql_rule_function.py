@@ -35,21 +35,16 @@ def build_dynamic_rule_engine(rule: RuleSchema):
     WHERE 1=1
     """
     params = {}
-
-   
     # SALARY (always include IS NULL)
    
-    salary_rule = rule.salary
-
-    salary_op = salary_rule.operator
-
+    salary_rule = rule['salary']
+    salary_op = salary_rule['operator']
     salary_conditions = ["salary IS NULL"]
 
     if salary_op == "between":
-
         salary_conditions.append("salary BETWEEN :salary_lower AND :salary_upper")
-        params["salary_lower"] = salary_rule.lower
-        params["salary_upper"] = salary_rule.upper
+        params["salary_lower"] = salary_rule['lower']
+        params["salary_upper"] = salary_rule['upper']
 
     else:
         op_map = {
@@ -60,55 +55,48 @@ def build_dynamic_rule_engine(rule: RuleSchema):
             "greater_than": ">",
             "greater_than_equal": ">="
         }
-
         salary_conditions.append(f"salary {op_map[salary_op]} :salary_value")
 
-        params["salary_value"] = salary_rule.value
+        params["salary_value"] = salary_rule['value']
 
     sql += " AND (" + " OR ".join(salary_conditions) + ")"
-
     # GENDER optional
-   
-    if getattr(rule, "gender", None) and rule.gender.value is not None:
+    if rule['gender']['value']!="NULL":
         op_map_gender = {"equal": "=", "not_equal": "!="}
-        gender_op = op_map_gender[rule.gender.operator]
-        sql += f" AND gender {gender_op} :gender_value"
-        params["gender_value"] = rule.gender.value
-
-   
+        gender_op = op_map_gender[rule['gender']['operator']]
+        sql += f" AND (gender {gender_op} :gender_value)"
+        params["gender_value"] = rule['gender']['value']
+    
     # TYPEDATA
-   
-    typedata_rule = rule.typedata
-
+    typedata_rule = rule["typedata"]
+    typedata_value=rule["typedata"]["value"]
     op_map_typedata = {"equal": "=", "not_equal": "!="}
-    typedata_op = op_map_typedata[typedata_rule.operator]
+    typedata_op = op_map_typedata[typedata_rule["operator"]]
+    sql += f" AND (typedata {typedata_op} :typedata_value)"
+    params["typedata_value"]=typedata_value
 
-    sql += f" AND typedata {typedata_op} :typedata_value"
-    params["typedata_value"] = typedata_rule.value
-
-    
     # DERIVED INCOME
-   
-    if getattr(rule, "derived_income", None) and rule.derived_income.value is not None:
-        income_rule = rule.derived_income
-        income_op = income_rule.operator
-
+    if  rule["derived_income"]['value']!=0.0 or rule['derived_income']['upper']!=0.0 or rule['derived_income']['lower']!=0.0:
+        income_rule = rule["derived_income"]
+        income_op = income_rule["operator"]
         if income_op == "between":
-            sql += " AND derived_income BETWEEN :income_lower AND :income_upper"
-            params["income_lower"] = income_rule.lower
-            params["income_upper"] = income_rule.upper
+            sql += " AND (derived_income BETWEEN :income_lower AND :income_upper)"
+            params["income_lower"] = income_rule["lower"]
+            params["income_upper"] = income_rule["upper"]
         else:
-            op_map_income = {"equal": "=", "not_equal": "!="}
-            sql += f" AND derived_income {op_map_income[income_op]} :income_value"
-            params["income_value"] = income_rule.value
+            op_map_income = {"equal": "=", "not_equal": "!=","less_than": "<","less_than_equal": "<=","greater_than": ">","greater_than_equal": ">="}
+            sql += f" AND (derived_income {op_map_income[income_op]} :income_value)"
+            print("print the income value from the sql query builder")
+            print(income_rule['value'])
+            params["income_value"] = income_rule["value"]
+
+
+        
     
-
-    # AGE calculated from SA ID number
-
-    if getattr(rule, "age", None) and rule.age.value is not None:
-        age_rule = rule.age
-        age_op = age_rule.operator
-
+    #AGE calculated from SA ID number
+    if rule["age"]["value"] is not None:
+        age_rule = rule["age"]
+        age_op = age_rule["operator"]
         # Base age calculation expression
         age_expr = """
         EXTRACT(YEAR FROM AGE(
@@ -136,18 +124,21 @@ def build_dynamic_rule_engine(rule: RuleSchema):
 
         if age_op == "between":
             sql += f" AND ({age_expr} BETWEEN :age_lower AND :age_upper)"
-            params["age_lower"] = age_rule.lower
-            params["age_upper"] = age_rule.upper
+            params["age_lower"] = age_rule["lower"]
+            params["age_upper"] = age_rule["upper"]
         else:
             sql += f" AND ({age_expr} {op_map_age[age_op]} :age_value)"
-            params["age_value"] = age_rule.value
+            params["age_value"] = age_rule["value"]
 
-    # LAST_USED
-
-    if getattr(rule, "last_used", None) and rule.last_used.value is not None:
-        
-        last_used_days = rule.last_used.value
-        sql += " AND (last_used IS NULL OR DATE_PART('day', now() - last_used) > :last_used_days)"
-        params["last_used_days"] = last_used_days
-
+    # date last used records
+    if rule["last_used"]["value"] is not None:
+        last_used_days = rule["last_used"]["value"]
+        sql += " AND (last_used IS NULL OR DATE_PART('day', now() - last_used) > :last_used)"
+        params["last_used"] = last_used_days
+    
+    if rule['number_of_records'] is not None:
+        number_of_records=rule["number_of_records"]["value"]
+        params["number_of_records"]=number_of_records
+        sql += " LIMIT :number_of_records"
+    
     return text(sql), params

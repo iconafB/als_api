@@ -2498,3 +2498,5 @@ sqlalchemy.exc.InvalidRequestError: Mapper 'Mapper[campaign_rule_tbl(campaign_ru
 2025-11-17 09:00:26,166 - als auth logger - INFO - username:Mnqobi@gmail.com successfully logged in
 2025-11-17 15:54:33,660 - als auth logger - INFO - username:Mnqobi@gmail.com successfully logged in
 2025-11-17 15:54:33,660 - als auth logger - INFO - username:Mnqobi@gmail.com successfully logged in
+2025-11-18 08:03:18,954 - als auth logger - INFO - username:Mnqobi@gmail.com successfully logged in
+2025-11-18 08:03:18,954 - als auth logger - INFO - username:Mnqobi@gmail.com successfully logged in

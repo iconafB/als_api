@@ -1,6 +1,6 @@
 from fastapi import HTTPException,status
-from typing import Optional,Any,Literal,Dict,Union
-from pydantic import BaseModel,model_validator,ValidationError,Field as PydField,field_validator
+from typing import Optional,Any,Literal
+from pydantic import BaseModel,model_validator,Field as PydField
 from enum import Enum
 
 
@@ -15,7 +15,6 @@ class Operator(str,Enum):
  #lower' and 'upper' must not be provided for operator 'equal'
 
 class NumericCondition(BaseModel):
-
     operator: Literal[
         "equal", "not_equal",
         "less_than", "less_than_equal",
@@ -26,8 +25,10 @@ class NumericCondition(BaseModel):
     value: Optional[float] = None
     lower: Optional[float] = None
     upper: Optional[float] = None
+
     @model_validator(mode="before")
     def validate_numeric_condition(cls, values):
+
         op = values.get("operator")
         value = values.get("value")
         lower = values.get("lower")
@@ -55,7 +56,7 @@ class NumericCondition(BaseModel):
 
 #checked
 class LastUsedCondition(BaseModel):
-    operator:Literal["less_than","less_than_equal","equal"]
+    operator:Literal["less_than","less_than_equal","equal","greater_than","greater_than_equal"]
     value:int
     @model_validator(mode="before")
     def validate_value_type(cls, values):
@@ -64,7 +65,19 @@ class LastUsedCondition(BaseModel):
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,detail=f"Invalid type for 'value'. Expected 'int', got '{type(value).__name__}'.")
         return values
 
+class RecordsLoadedCondition(BaseModel):
+    Operator:Literal["equal"]
+    value:int
+    @model_validator(mode="before")
+    def validate_value_type(cls, values):
+        value = values.get("value")
+        if not isinstance(value, int):
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,detail=f"Invalid type for 'value'. Expected 'int', got '{type(value).__name__}'.")
+        
+        return values
+        
 #checked
+
 class TypeDataCondition(BaseModel):
     operator: Literal["equal","not_equal"]
     value: Literal["Status","Enriched","None"]
@@ -123,6 +136,7 @@ class IsActiveCondition(BaseModel):
     value: Literal[True]
 
 
+#Checked
 class AgeCondition(BaseModel):
 
     operator: Literal[
@@ -146,7 +160,7 @@ class AgeCondition(BaseModel):
                 raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,detail="Both lower and upper must be provided for 'between'")
             if upper < lower:
                 raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,detail="Age upper must be >= lower")
-            if value is not None:
+            if value!=0 and op == 'between':
                 raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,detail="'value' must not be provided for 'between'")
             
         elif op in ["less_than", "less_than_equal"]:
@@ -171,19 +185,22 @@ class RuleSchema(BaseModel):
     typedata:TypeDataCondition
     is_active:IsActiveCondition
     age:AgeCondition
-    derived_income:NumericCondition
+    derived_income:Optional[NumericCondition]=None
     is_deduped:bool
     last_used:Optional[LastUsedCondition]=None
-    
+    number_of_records:RecordsLoadedCondition
 
+    
+#Flattend Numeric Response Condition
 class NumericConditionResponse(BaseModel):
     operator: str
     value: Optional[float] = None
     lower: Optional[float] = None
     upper: Optional[float] = None
-
     @classmethod
-    def from_condition(cls, condition: dict):
+    def from_condition(cls, condition: Optional[dict]):
+        if condition is None:
+            return None
         if condition["operator"] == "between":
             return cls(operator=condition["operator"], lower=condition.get("lower"), upper=condition.get("upper"))
         else:
@@ -196,7 +213,6 @@ class AgeConditionResponse(BaseModel):
     value: Optional[int] = None
     lower: Optional[int] = None
     upper: Optional[int] = None
-
     @classmethod
     def from_condition(cls, condition: dict):
         if condition["operator"] == "between":
@@ -210,6 +226,9 @@ class LastUsedConditionResponse(BaseModel):
     @classmethod
     def from_condition(cls, condition: dict):
         return cls(value=condition.get("value"))
+    
+class RecordsLoadedConditionResponse(LastUsedConditionResponse):
+    pass
 
 # Top-level response model
 class RuleResponseModel(BaseModel):
@@ -217,14 +236,13 @@ class RuleResponseModel(BaseModel):
     id: int
     name: str
     salary: NumericConditionResponse
-    derived_income: NumericConditionResponse
+    derived_income: Optional[NumericConditionResponse]=None
     gender: str
     typedata: str
     is_active: bool
     age: AgeConditionResponse
     last_used: Optional[LastUsedConditionResponse] = None
-
-
+    records_loaded:Optional[RecordsLoadedConditionResponse]=None
 
 
 
@@ -234,6 +252,7 @@ class CreateRule(BaseModel):
     name:bool
     status:bool
     definition:RuleSchema
+
 
 
 class ResponseRuleSchema(BaseModel):

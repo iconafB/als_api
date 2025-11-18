@@ -5,7 +5,7 @@ from utils.auth import get_current_active_user
 from database.master_db_connect import get_async_session
 from database.master_db_connect import get_async_session
 from models.rules_table import RulesTable
-from schemas.rules_schema import CreateRule,ResponseRuleSchema,RuleSchema,RuleResponseModel,NumericConditionResponse,AgeConditionResponse,LastUsedConditionResponse
+from schemas.rules_schema import CreateRule,ResponseRuleSchema,RuleSchema,RuleResponseModel,NumericConditionResponse,AgeConditionResponse,LastUsedConditionResponse,RecordsLoadedConditionResponse
 from utils.dynamic_sql_rule_function import build_dynamic_rule_engine
 from crud.rule_engine_db import (create_person_db,get_rule_by_name_db)
 from schemas.person import PersonCreate,PersonCreateResponse
@@ -13,11 +13,8 @@ from schemas.person import PersonCreate,PersonCreateResponse
 practice_rule_router=APIRouter(prefix="/practice-rule",tags=["Practice Rule"])
 
 @practice_rule_router.post("/rules",status_code=status.HTTP_200_OK,description="Create Rule",response_model=RuleResponseModel)
+
 async def create_rule(campaign_code:str,status:str,rule:RuleSchema,session:AsyncSession=Depends(get_async_session)):
-    print("print the json payload")
-    print(rule)
-    print(f"the rule name is:{rule}")
-    print(f"the rule status is:{status}")
     db_rule=RulesTable(name=campaign_code,status=status,rule_json=rule.model_dump())
     session.add(db_rule)
     await session.commit()
@@ -33,10 +30,13 @@ async def create_rule(campaign_code:str,status:str,rule:RuleSchema,session:Async
         typedata=rule_json["typedata"]["value"],
         is_active=rule_json["is_active"]["value"],
         age=AgeConditionResponse.from_condition(rule_json["age"]),
+        records_loaded=RecordsLoadedConditionResponse.from_condition(rule_json["number_of_records"])
+        if rule_json.get("number_of_records") else None
+        ,
         last_used=LastUsedConditionResponse.from_condition(rule_json["last_used"])
         if rule_json.get("last_used") else None
     )
-    
+
     return response
 
 @practice_rule_router.put("/rules/{name}",status_code=status.HTTP_200_OK,description="Update the rule name")
@@ -48,19 +48,16 @@ async def update_rule(name:str,updated:RuleSchema,session:AsyncSession=Depends(g
     print(result)
     return True
 
-@practice_rule_router.get("/persons/by-rule/{rule_name}")
+@practice_rule_router.get("/persons/{rule_name}")
 async def get_persons_by_rule_name(rule_name:str,session:AsyncSession=Depends(get_async_session)):
     result=await get_rule_by_name_db(rule_name,session)
     if result==None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"The requested rule does not exist")
-    print("print the json object from the get persons route handler")
-    print(result[0].rule_json)
     stmt,params=build_dynamic_rule_engine(result[0].rule_json)
-    # rows=(await session.execute(stmt,params)).all()
-    # print("print the rows from the get persons route")
-    # print(rows)
+    rows=(await session.execute(stmt,params)).all()
 
-    return True
+    return rows
+
     
 @practice_rule_router.post("/create-person",status_code=status.HTTP_201_CREATED,response_model=PersonCreateResponse)
 async def create_person(person:PersonCreate,session:AsyncSession=Depends(get_async_session)):
