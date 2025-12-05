@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio.session import AsyncSession
 from utils.auth import get_current_active_user
 from database.master_db_connect import get_async_session
 from database.master_db_connect import get_async_session
-from models.rules_table import RulesTable
+from models.rules_table import rules_tbl
 from schemas.rules_schema import CreateRule,ResponseRuleSchema,RuleSchema,RuleResponseModel,NumericConditionResponse,AgeConditionResponse,LastUsedConditionResponse,RecordsLoadedConditionResponse
 from utils.dynamic_sql_rule_function import build_dynamic_rule_engine
 from crud.rule_engine_db import (create_person_db,get_rule_by_name_db)
@@ -15,7 +15,7 @@ practice_rule_router=APIRouter(prefix="/practice-rule",tags=["Practice Rule"])
 @practice_rule_router.post("/rules",status_code=status.HTTP_200_OK,description="Create Rule",response_model=RuleResponseModel)
 
 async def create_rule(campaign_code:str,status:str,rule:RuleSchema,session:AsyncSession=Depends(get_async_session)):
-    db_rule=RulesTable(name=campaign_code,status=status,rule_json=rule.model_dump())
+    db_rule=rules_tbl(rule_name=campaign_code,status=status,rule_json=rule.model_dump())
     session.add(db_rule)
     await session.commit()
     await session.refresh(db_rule)
@@ -23,7 +23,7 @@ async def create_rule(campaign_code:str,status:str,rule:RuleSchema,session:Async
     response=RuleResponseModel(
         status=db_rule.status,
         id=db_rule.id,
-        name=db_rule.name,
+        rule_name=db_rule.rule_name,
         salary=NumericConditionResponse.from_condition(rule_json["salary"]),
         derived_income=NumericConditionResponse.from_condition(rule_json["derived_income"]),
         gender=rule_json["gender"]["value"],

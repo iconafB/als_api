@@ -3,9 +3,11 @@ from sqlalchemy import text
 from sqlmodel.ext.asyncio.session import AsyncSession
 from typing import List,Optional,Sequence,Dict,Tuple
 from models.campaigns import dedupe_campaigns_tbl
-
+from models.dedupe_keys_table import manual_dedupe_key_tbl
 from schemas.dedupe_campaigns import CreateDedupeCampaign
+from utils.logger import define_logger
 
+dedupe_logger=define_logger("als_dedupe_campaign_logs","logs/dedupe_route.log")
 #create a deduped campaign
 async def create_dedupe_campaign(campaign:CreateDedupeCampaign,session:AsyncSession)->dedupe_campaigns_tbl:
     session.add(campaign)
@@ -13,15 +15,15 @@ async def create_dedupe_campaign(campaign:CreateDedupeCampaign,session:AsyncSess
     await session.refresh(campaign)
     return campaign
 
+
+
 #change a dedupe campaign to a generic campaign
 async def change_dedupe_campaign_to_generic_campaign(camp_code:str,branch:str,session:AsyncSession)->Optional[dedupe_campaigns_tbl]:
-    
     result=await session.exec(select(dedupe_campaigns_tbl).where((dedupe_campaigns_tbl.camp_code==camp_code)&(dedupe_campaigns_tbl.branch==branch)))
     db_item=result.one_or_none()
     if not db_item:
         return None
     db_item.is_deduped=False
-
     session.add(db_item)
     await session.commit()
     await session.refresh(db_item)
@@ -530,3 +532,18 @@ def build_where_clause(filters:dict)->Tuple[str,dict]:
 
 
     return where_sql, params
+
+
+
+async def create_manual_dedupe_key(session:AsyncSession,rule_name:str,dedupe_key:str,number_of_leads:int,user):
+    try:
+        record=manual_dedupe_key_tbl(rule_name=rule_name,dedupe_key=dedupe_key,number_of_leads=number_of_leads)
+        session.add(record)
+        await session.commit()
+        await session.refresh(record)
+        dedupe_logger.info(f"manual dedupe key:{dedupe_key} committed to the db by user:{user.id} with email:{user.email}")
+        return record
+    
+    except Exception:
+        dedupe_logger.exception("An exception occurred while committing dedupe key to the table")
+        raise

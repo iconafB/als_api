@@ -6,7 +6,7 @@ from datetime import datetime
 #store the audit id, number of records,records processed and created_at date, this table tracks the dma
 
 class dma_audit_id_table(SQLModel,table=True):
-    id:Optional[int] | None=Field(primary_key=True,default=None)
+    id:int=Field(primary_key=True,nullable=False)
     audit_id:str=Field(nullable=False,default=None,index=True)
     number_of_records:int=Field(nullable=False,default=None)
     notification_email:str=Field(nullable=False,default=None,index=True)
@@ -17,8 +17,8 @@ class dma_audit_id_table(SQLModel,table=True):
 
 
 class dma_records_table(SQLModel,table=True):
-    id:Optional[int] | None=Field(primary_key=True,default=None)
-    audit_id:str=Field(nullable=False,default=None,index=True)
+    id:int=Field(primary_key=True,nullable=False)
+    audit_id:str=Field(nullable=False,default=None,index=True,foreign_key="")
     data_entry:str=Field(nullable=False,default=None)
     date_added:str=Field(nullable=False,default=None)
     opted_out:bool=Field(nullable=False,default=None)

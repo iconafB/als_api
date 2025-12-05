@@ -7,8 +7,9 @@ from sqlalchemy import func
 
 if TYPE_CHECKING:
     from models.information_table import info_tbl
-class finance_tbl(SQLModel,table=True):
 
+   
+class finance_tbl(SQLModel,table=True):
     cell:str=Field(primary_key=True,foreign_key="info_tbl.cell")
     cipro_reg:Optional[bool]=None
     deed_office_reg:Optional[bool]=None

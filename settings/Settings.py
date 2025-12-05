@@ -69,6 +69,18 @@ class Settings(BaseSettings):
     MAIL_TLS:bool
     MAIL_SSL:bool
     USER_CREDENTIALS:bool
+
+    #MASTER DB CREDENTIALS
+    MASTER_HOST:str
+    MASTER_PORT:int
+    MASTER_PASSWORD:str
+    MASTER_USER:str
+    MASTER_OWNER:str
+
+    #API CREDENTIALS
+    ADMIN_USERNAME:str
+    ADMIN_PASSWORD:str
+    
     
     #load the environment variables file
     model_config=SettingsConfigDict(env_file=".env")

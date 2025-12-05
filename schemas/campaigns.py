@@ -9,6 +9,18 @@ class CreateCampaignResponse(BaseModel):
         "from_attributes":True
     }
 
+class InfiniteResponseSchema(BaseModel):
+    camp_code:str
+    campaign_name:str
+    model_config={
+        "from_attributes":True
+    }
+
+class PaginatedInfiniteResponse(BaseModel):
+    total:int
+    page:int
+    page_size:int
+    results:List[InfiniteResponseSchema]
 
 class PaginatedCampaigResponse(BaseModel):
     total:int
@@ -33,6 +45,8 @@ class LoadCampaign(BaseModel):
 
 class UpdateCampaignName(BaseModel):
     campaign_name:str
+
+
 class CampaignSpec(BaseModel):
     id_number:str
     fore_name:str
@@ -45,7 +59,7 @@ class LoadCampaignResponse(BaseModel):
     list_name:str
     audit_id:str
     records_processed:int
-    dma_status_code:int
-    load_dmasa_status:str
-    number_of_leads_submitted:int
+    model_config={
+        "from_attributes":True
+    }
 

@@ -12,7 +12,7 @@ class users_table(SQLModel,table=True):
     first_name:str=Field(default=None,nullable=False)
     last_name:str=Field(default=None,nullable=False)
     is_active:bool=Field(default=None,nullable=False)
-    created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False,default=None)
+    created_at:Optional[datetime]=Field(sa_column_kwargs={"server_default":func.now()},nullable=False)
 
 class reset_tokens(SQLModel,table=True):
     id:Optional[int]=Field(primary_key=True,default=None)

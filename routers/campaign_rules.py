@@ -1,122 +1,80 @@
-from fastapi import APIRouter,HTTPException,status,Depends,Query,Path,Request
-from sqlmodel import Session,select,text,update
-from datetime import datetime
-from typing import List
+from fastapi import APIRouter,HTTPException,status,Depends,Query,Path
+from sqlmodel import Session,select,text
+from datetime import datetime,date
+from typing import Optional
 from sqlmodel.ext.asyncio.session import AsyncSession
-from models.users import users_table
+from sqlalchemy.exc import SQLAlchemyError
 from models.rules_table import rules_tbl
 from models.campaigns_table import campaign_tbl
 from models.campaign_rules_table import campaign_rule_tbl
-from schemas.sql_rule import Sql_Rules,Change_Active_Rule
 from schemas.campaign_rules import RuleCreate,AssignCampaignRuleToCampaign,AssignCampaignRuleResponse,CampaignSpecResponse,CreateCampaignRuleResponse,ChangeCampaignRuleResponse,PaginatedCampaignRules
 from schemas.campaign_rules_input import FetchRuleResponse,UpdateCampaignRulesResponse
-from database.database import get_session
+from schemas.rules_schema import ResponseRuleSchema,RuleSchema,RuleResponseModel,NumericConditionResponse,AgeConditionResponse,LastUsedConditionResponse,RecordsLoadedConditionResponse,UpdateCampaignRule,UpdatingCampaignRuleResponse,DeactivateRuleResponseModel,ActivateRuleResponseModel,UpdatingSalarySchema,UpdatingDerivedIncomeSchema,UpdateAgeSchema,GetCampaignRuleResponse,GetAllCampaignRulesResponse,ChangeRuleResponse,UpdateNumberOfLeads,UpdateNumberOfLeadsResponse,DeleteCampaignRuleResponse
 from database.master_db_connect import get_async_session
 from utils.logger import define_logger
 from utils.auth import get_current_active_user
-from crud.campaign_rules import (create_campaign_rule_db,assign_campaign_rule_to_campaign_db,get_campaign_rule_by_rule_name_db,get_all_campaign_rules_db)
+from crud.campaign_rules import (create_campaign_rule_db,assign_campaign_rule_to_campaign_db,get_all_campaign_rules_db, get_rule_by_rule_code_db, get_campaign_rule_by_rule_name_db,update_campaign_name_db,deactivate_campaign_db,activate_campaign_db,update_salary_for_campaign_rule_db,update_derived_income_for_campaign_rule_db,search_for_a_campaign_rule_db,fetch_campaign_code_from_campaign_tbl_db,fetch_rule_code_from_rules_tbl_and_campaign_rules_tbl_db,update_campaign_rule_and_insert_rule_code_db,insert_new_campaign_rule_on_campaign_rule_tbl_db,update_number_of_leads_db,update_campaign_rule_age_db,remove_campaign_rule_db)
 from utils.campaigns import (load_campaign_query_builder)
-from utils.parse_validation_methods import parse_and_validate_rule
+from utils.campaign_rules_helper import transform_rule_json
+#from utils.parse_validation_methods import parse_and_validate_rule
 
-campaign_rule_router=APIRouter(tags=["Generic Campaign Rules"],prefix="/campaign_rules")
+campaign_rule_router=APIRouter(tags=["Campaign Rules"],prefix="/campaign_rules")
 
 campaign_rules_logger=define_logger("als campaign rules","logs/campaign_rules_logs")
-@campaign_rule_router.post("",status_code=status.HTTP_200_OK,description="Create a campaign rule by the necessary info",response_model=CreateCampaignRuleResponse)
 
-async def create_campaign_rule(rule:RuleCreate,session:AsyncSession=Depends(get_async_session),user=Depends(get_current_active_user),parsed_data=Depends(parse_and_validate_rule)):
-    create_rule=await create_campaign_rule_db(rule,session,user)
-    campaign_rules_logger.info(f"user {user.id} with email:{user.email} created campaign rule:{rule.rule_name}")
+@campaign_rule_router.post("",status_code=status.HTTP_200_OK,description="Create a campaign rule by the necessary info",response_model=RuleResponseModel)
+
+async def create_campaign_rule(rule:RuleSchema,campaign_code:str=Query(...,description="Enter the campaign code associated with this rule"),session:AsyncSession=Depends(get_async_session),user=Depends(get_current_active_user)):
+    print("Enter the create rule route")
+    create_rule=await create_campaign_rule_db(campaign_code=campaign_code,rule=rule,session=session,user=user)
+    campaign_rules_logger.info(f"user :{user.id} with email: {user.email} created campaign rule:{create_rule.rule_name}")
     return create_rule
 
 
-
-@campaign_rule_router.put("/change_rule/{rule_name}")
-#How would the user of this route know the rule code
-async def change_rule(rule_code:int,camp_code:str=Path(...,description="provide the campaign code"),session:AsyncSession=Depends(get_async_session),user=Depends(get_current_active_user)):
-    try:
-        #find the campaign code on the campaign_rule_tbl
-        campaign_code_query=await session.exec(select(campaign_rule_tbl).where(campaign_rule_tbl.camp_code==camp_code))
-        campaign_code_value=campaign_code_query.first()
-        #Accounted for
-
-        if campaign_code_value is None:
-            campaign_rules_logger.info(f"user:{user.id} with email:{user.email} attempted to change campaign rule:{camp_code} but it does not exist")
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"Campaign code:{camp_code} does not exist on the campaign rule table,Create campaign before setting a rule for it")
-        
-
-        stmt1=text("""
-                    SELECT r.rule_code
-                    FROM campaign_rule_tbl c
-                    JOIN rules_tbl r ON c.rule_code = r.rule_code
-                    WHERE c.camp_code = :camp_code
-                    AND c.is_active = TRUE
-                    """)
-        
-
-        stmt1_result=await session.execute(stmt1,{"camp_code":camp_code})
-        todaysdate=datetime.today().strftime("%Y-%m-%d")
-
-        rule_codes:list[int]=stmt1_result.scalars().all()
-        #so here I am getting a list of rule codes e.g. [12,24,10]
-        old_rule_code=rule_codes[0]
-
-        result_count=len(rule_codes)
-
-       
-
-        if result_count!=0:
-            message=f"rule code:{old_rule_code} was found and deactivated,rule code:{rule_code} is now active for campaign code:{camp_code}"
-            
-            stmt_update=text("""
-                        UPDATE campaign_rule_tbl 
-                        SET is_active = False 
-                        WHERE camp_code = :camp_code
-                         """)
-            
-           
-            result=await session.execute(stmt_update,{"camp_code":camp_code})
-
-            await session.commit()
-
-            campaign_rules_logger.info(f"user:{user.id} with email {user.email} updated campaign code:{rule_code}")
-            #List of updated database objects
-            update_length=len(result.all())
-
-            stmt_insert=text("""
-                            INSERT INTO campaign_rule_tbl(camp_code,rule_code,date_rule_created,is_active)
-                            VALUES(:camp_code,:rule_code,:date_rule_created,TRUE)
-                        """)
-            
-            insert_result_stmt=await session.execute(stmt_insert,{"camp_code":camp_code,"rule_code":rule_code,"date_rule_created":todaysdate})
-            
-            await session.commit()
-
-            
-        else:
-            message = f'NO ACTIVE RULE was found active for campaign {rule_code} but rule {campaign_code_value.rule_code} was made active for it'
-            
-            stmt_insert=text("""
-                            INSERT INTO campaign_rule_tbl(camp,rule_code,date_rule_created,is_active)
-                            VALUES(:camp_code,:rule_code,:date_rule_created,TRUE)
-                        """)
-            stmt_result_insert=await session.execute(stmt_insert,{"camp_code":camp_code,"rule_code":campaign_code_value.rule_code,"date_rule_created":todaysdate})
-            
-            insert_query_length=stmt_result_insert.all()
-
-            await session.commit()
-
-            #the route ends here
-        return ChangeCampaignRuleResponse(Success=True,Message=message)
+#fetch all the rules on the database ,add pagination and search
+@campaign_rule_router.get("",status_code=status.HTTP_200_OK,description="Get all campaign rules",response_model=GetAllCampaignRulesResponse)
+async def fetch_all_campaign_rules(page:int=Query(1,ge=1,description="Value should be greater than or equal 1"),page_size:int=Query(10,ge=1,le=100,description="Number of items in a page,maximum is 100"),session:AsyncSession=Depends(get_async_session),user=Depends(get_current_active_user)):
+    return await get_all_campaign_rules_db(page,page_size,session,user)
     
-    except Exception as e:
-        campaign_rules_logger.exception(f"exception:{str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"An internal server error occurred while changing the rule name:{rule_name}")
+#search for a campaign rule
+@campaign_rule_router.get("/search",status_code=status.HTTP_200_OK,description="Search for  campaign rule using a rule name,salary, andderived income")
+async def search_for_campaign_rule(page:int=Query(1,ge=1,description="Current page number for pagination(starts at 1)"),page_size:int=Query(20,ge=1,le=100,description="Number of records per page"),rule_name:str=Query(None,description="Search for a campaign rule using the rule name or campaign code"),salary:int=Query(None,description="Search for a campaign rule using the salary"),derived_income:int=Query(None,description="Search for campaign rule using the derived income"),session:AsyncSession=Depends(get_async_session),user=Depends(get_current_active_user)):
+    print("enter the search route")
+    return await search_for_a_campaign_rule_db(page,page_size,session,user,rule_name,salary,derived_income,sort_by="created_at",sort_order="desc")
 
+# @campaign_rule_router.put("/change_rule",status_code=status.HTTP_200_OK,description="Assign campaign rule to an existing campaign if the campaign does not exist create it",response_model=AssignCampaignRuleResponse)
+# async def change_rule(rule:AssignCampaignRuleToCampaign,session:AsyncSession=Depends(get_async_session)):
+#     return await assign_campaign_rule_to_campaign_db(rule,session)
+
+
+#calculate the number of leads for a rule
+#Questionable check again
+
+@campaign_rule_router.get("/campaign_spec",description="Provide a rule name or campaign code to get the number of leads for that spec. The rule name is the spec name",status_code=status.HTTP_200_OK)
+async def check_number_of_leads_for_campaign_rule(rule_name:str,user=Depends(get_current_active_user),session:AsyncSession=Depends(get_async_session)):
+    try:
+        spec_query=select(rules_tbl).where(rules_tbl.rule_name==rule_name)
+        spec_number_call=await session.exec(spec_query)
+        result=spec_number_call.first()
+        if result is None:
+            campaign_rules_logger.exception(f"user {user.id} with email {user.email} caused exception:{str(e)}")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"Campaign spec has nothing")
+        #campaign spec for a generic campaign
+        query,params=load_campaign_query_builder(result)
+        #check the spec
+        number_of_leads=await session.execute(query,params)
+        results=number_of_leads.fetchall()
+        campaign_rules_logger.info(f"user {user.id} with email {user.email} checked specification for campaign:{rule_name}")
+        return CampaignSpecResponse(Success=True,Number_Of_Leads=len(results))
+    except HTTPException:
+        raise
+    except Exception as e:
+        campaign_rules_logger.exception(f"user {user.id} with email {user.email} caused exception:{str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"An internal server error occurred while checking spec for campaign code:{rule_name}")
 
 
 #assign campaign rule to a campaign
 @campaign_rule_router.post("/assign/{rule_code}",description="assign a campaign rule to an existing campaign")
-
 async def assign_active_rule_to_campaign(rule_code:int,camp_code:str,session:AsyncSession=Depends(get_async_session),user=Depends(get_current_active_user)):
     try:
         campaign_code_query=select(campaign_tbl).where(campaign_tbl.camp_code==camp_code)
@@ -160,147 +118,113 @@ async def assign_active_rule_to_campaign(rule_code:int,camp_code:str,session:Asy
         campaign_rules_logger(f"{str(e)}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail="internal server error occurred")
 
-#change an active rule
-# @campaign_rule_router.patch("/change-active-rule/{rule_code}",description="Provide a rule code to change an active rule")
-
-# async def update_active_rule(rule_code:str,incoming_rule:Change_Active_Rule,session:Session=Depends(get_session),user=Depends(get_current_active_user)):
-#     #find the rule using a rule code using the below query
-#     print("Print the incoming data")
-#     print(incoming_rule)
-#     rule_query=select(campaign_rules).where(campaign_rules.rule_code==rule_code)
-#     #execute the query
-#     rule=session.exec(rule_query).first()
-#     if rule == None:
-#         #raise an exception and break
-#         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"rule code:{rule_code} does not exist")
-#     print("Print the incoming rule")
-#     print(rule)
-#     #the below code is unacceptable
-
-#     #update the salary min and max
-#     if incoming_rule.max_salary !=rule.max_salary:
-#         print("print update max salary")
-#         rule.max_salary=incoming_rule.max_salary
-#         session.add(rule)
-#         session.commit()
-    
-#     if incoming_rule.min_salary != rule.min_salary:
-#         print("print update minimum salary")
-#         rule.min_salary=incoming_rule.min_salary
-#         session.add(rule)
-#         session.commit()
-
-#     #update min and max age
-#     if incoming_rule.min_age != rule.min_age:
-#         print("print update min age")
-#         rule.min_age=incoming_rule.min_age
-#         session.add(rule)
-#         session.commit()
-
-#     if incoming_rule.max_age != rule.max_age:
-#         print("print update max age")
-#         rule.max_age=incoming_rule.max_age
-#         session.add(rule)
-#         session.commit()
-
-#     #update gender
-#     if incoming_rule.gender != rule.gender:
-#         print("print update gender")
-#         rule.gender=incoming_rule.gender
-#         session.add(rule)
-#         session.commit()
-
-#     #update city
-#     if incoming_rule.city != rule.city:
-#         print("print update city")
-#         rule.city=incoming_rule.city
-#         session.add(rule)
-#         session.commit()
-#     #update province
-#     if incoming_rule.province == rule.province:
-#         # update and commit the value(s)
-#         print("print update province")
-#         rule.province=incoming_rule.province
-
-#     #update the values and commit it using the session object
-#     data=rule.model_dump()
-#     #validate the data against the existing model
-#     data_obj=campaign_rules.model_validate(data)
-
-#     return data_obj
-
-
 #fetch rule code based on campaign code
-
-@campaign_rule_router.get("/{rule_name}",status_code=status.HTTP_200_OK,response_model=rules_tbl)
-async def fetch_rule_code(rule_name:str=Path(...,description="Provide the rule name which is the same as the campaign code"),session:AsyncSession=Depends(get_async_session),user=Depends(get_current_active_user)):
+@campaign_rule_router.get("/{rule_name}",status_code=status.HTTP_200_OK,description="Get campaign rule by rule name",response_model=GetCampaignRuleResponse)
+async def get_campaign_rule_by_rule_name(rule_name:str=Path(...,description="Provide the rule name which is the same as the campaign code"),session:AsyncSession=Depends(get_async_session),user=Depends(get_current_active_user)):
     try:
-        rule_name_query=select(rules_tbl).where(rules_tbl.rule_name==rule_name)
-        rule_name_entry=await session.exec(rule_name_query).first()
-        if not rule_name_entry:
-            campaign_rules_logger.info(f"user with id:{user.id} and email:{user.email} requested a campaign with rule name:{rule_name}")
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"campaign rule with:{rule_name} does not exist")
-        return rule_name_entry
+        get_rule=await get_campaign_rule_by_rule_name_db(rule_name,session,user)
+        if get_rule==None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"Camapign rule with campaign code:{rule_name} does not exist")
+        transfromed_rule=transform_rule_json(get_rule)
+        return transfromed_rule
     
-    except Exception as e:
-        campaign_rules_logger.error(f"{str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error occurred while fetching campaign rule name:{rule_name}")
-
-#change the rule code
-#Do not change the rule code because it's auto generated by the database
-@campaign_rule_router.patch("/{rule_code}",status_code=status.HTTP_200_OK,response_model=rules_tbl)
-
-async def change_rule_name(rule_code:int=Path(...,description="Campaign code or rule name of a campaign"),rule_name:str=Query(...,description="Campaign name or rule name"),session:Session=Depends(get_async_session),user=Depends(get_current_active_user)):
-    try:
-        rule_query=select(rules_tbl).where(rules_tbl.rule_name==rule_code)
-        rule=await session.exec(rule_query).first()
-        if not rule:
-            campaign_rules_logger.info(f"user: {user.id}, email:{user.email} requested a change in rule name:{rule_name} but it does not exist")
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"user: {user.id}, email:{user.email} requested a change in rule name:{rule_name} but it does not exist")
-        rule.rule_name=rule_name
-        session.add(rule)
-        await session.commit()
-        await session.refresh(rule)
-        campaign_rules_logger.info(f"campaign with rule code:{rule_code} updated with rule name:{rule_name} by user:{user.id} with email:{user.email}")
-        return rule
-    
-    except Exception as e:
-        campaign_rules_logger.exception(f"An exception occurred while changing rule name:{rule_code}:{str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"An internal server error occurred")
-
-#fetch all the rules on the database ,add pagination and search
-@campaign_rule_router.get("",status_code=status.HTTP_200_OK,description="Get all campaign rules",response_model=PaginatedCampaignRules)
-async def fetch_campaign_rules(page:int=Query(1,ge=1,description="Page Number,Value should be greater than 1"),page_size:int=Query(10,ge=1,le=100,description="Number of items in a page,maximum is 100"),session:AsyncSession=Depends(get_async_session),user=Depends(get_current_active_user)):
-    return await get_all_campaign_rules_db(page,page_size,session,user)
-    
-
-
-
-@campaign_rule_router.put("/change_rule",status_code=status.HTTP_200_OK,description="Assign campaign rule to an existing campaign if the campaign does not exist create it",response_model=AssignCampaignRuleResponse)
-async def change_rule(rule:AssignCampaignRuleToCampaign,session:AsyncSession=Depends(get_async_session)):
-    return await assign_campaign_rule_to_campaign_db(rule,session)
-
-#calculate the number of leads for a rule
-#Questionable check again
-@campaign_rule_router.get("/campaign_spec",description="Provide a rule name or campaign code to get the number of leads for that spec. The rule name is the spec name",status_code=status.HTTP_200_OK)
-async def check_number_of_leads_for_campaign_rule(rule_name:str,user=Depends(get_current_active_user),session:AsyncSession=Depends(get_async_session)):
-    try:
-        spec_query=select(rules_tbl).where(rules_tbl.rule_name==rule_name)
-        spec_number_call=await session.exec(spec_query)
-        result=spec_number_call.first()
-        if result is None:
-            campaign_rules_logger.exception(f"user {user.id} with email {user.email} caused exception:{str(e)}")
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"Campaign spec has nothing")
-        #campaign spec for a generic campaign
-        query,params=load_campaign_query_builder(result)
-        #check the spec
-        number_of_leads=await session.execute(query,params)
-        results=number_of_leads.fetchall()
-        campaign_rules_logger.info(f"user {user.id} with email {user.email} checked specification for campaign:{rule_name}")
-        return CampaignSpecResponse(Success=True,Number_Of_Leads=len(results))
     except HTTPException:
         raise
+
     except Exception as e:
-        campaign_rules_logger.exception(f"user {user.id} with email {user.email} caused exception:{str(e)}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"An internal server error occurred while checking spec for campaign code:{rule_name}")
+        campaign_rules_logger.error(f"An internal server error occurred while fetching campaign rule:{rule_name}:{str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error occurred while fetching campaign rule name:{rule_name}")
+
+#define the response for this model
+@campaign_rule_router.get("/new/{rule_code}",status_code=status.HTTP_200_OK,description="Get campaign rule using the rule code",response_model=GetCampaignRuleResponse)
+async def get_campaign_rule_by_rule_code(rule_code:int=Path(...,description="rule code parameter"),session:AsyncSession=Depends(get_async_session),user=Depends(get_current_active_user)):
+    rule=await get_rule_by_rule_code_db(rule_code,session,user)
+    if rule==None:
+        campaign_rules_logger.info(f"user with user id:{user.id} with email:{user.email} requested campaign rule with rule code:{rule_code} but it does not exist")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"Campaign rule with rule code:{rule_code} does not exist")
+    return transform_rule_json(rule)
+
+
+#change the rule code
+@campaign_rule_router.patch("/{rule_code}",status_code=status.HTTP_200_OK,response_model=UpdatingCampaignRuleResponse)
+async def update_campaign_rule_name(new_campaign_name:UpdateCampaignRule,rule_code:int=Path(...,description="Provide the rule code for the campaign rule"),session:Session=Depends(get_async_session),user=Depends(get_current_active_user)):
+    update_rule_name,update_rule_code=await update_campaign_name_db(rule_code,new_campaign_name.new_campaign_rule_name,session,user)
+    return UpdatingCampaignRuleResponse(rule_code=update_rule_code,new_rule_name=update_rule_name)
+
+
+@campaign_rule_router.patch("/{rule_code}/deactivate",status_code=status.HTTP_200_OK,response_model=DeactivateRuleResponseModel)
+async def deactivate_campaign_rule(rule_code:int=Path(...,description="Please provide a rule code"),session:AsyncSession=Depends(get_async_session),user=Depends(get_current_active_user)):
+    return await deactivate_campaign_db(rule_code,session,user)
+
+@campaign_rule_router.patch("/{rule_code}/activate",status_code=status.HTTP_200_OK,description="Activate campaign rule by providing the rule code",response_model=ActivateRuleResponseModel)
+async def activate_campaign_rule(rule_code:int,session:AsyncSession=Depends(get_async_session),user=Depends(get_current_active_user)):
+    return await activate_campaign_db(rule_code,session,user)
+
+
+@campaign_rule_router.patch("/salary/{rule_code}",status_code=status.HTTP_200_OK,description="Upate the salary for a campaign rule, please note that for range based salary rules with operator between specify the lower limit and upper limit field(s),the salary field should be ignored, for other types of rules only populate the salary field")
+
+async def update_salary_for_campaign_rule(salary:UpdatingSalarySchema,rule_code:int=Path(...,description="Provide a rule code a campaign rule"),session:AsyncSession=Depends(get_async_session),user=Depends(get_current_active_user)):
+    
+    return await update_salary_for_campaign_rule_db(rule_code,salary,session,user)
+
+@campaign_rule_router.patch("/derived_income/{rule_code}",status_code=status.HTTP_200_OK,description="Update the derived income for a campaign rule, please note that for range based derived income with operator between specify the lower limit and/or upper limit field(s),the derived_income_value should be ignored, for other types of rules only populate the derived_income_value field.")
+
+async def update_derived_income(derived_income:UpdatingDerivedIncomeSchema,rule_code:int=Path(...,description="Provide the rule code"),session:AsyncSession=Depends(get_async_session),user=Depends(get_current_active_user)):
+    
+    return await update_derived_income_for_campaign_rule_db(rule_code,derived_income,session,user)
+
+
+@campaign_rule_router.patch("/update-age/{rule_code}",status_code=status.HTTP_200_OK,description="Update the age for a campaign rule")
+async def update_age_for_campaign_rule(ageSchema:UpdateAgeSchema,rule_code:int=Path(...,description="Provide the rule_code"),session:AsyncSession=Depends(get_async_session),user=Depends(get_current_active_user)):
+    return await update_campaign_rule_age_db(rule_code,ageSchema,session,user)
+
+
+@campaign_rule_router.patch("/update-leads/{rule_code}",status_code=status.HTTP_200_OK,description="Update the number of leads to load",response_model=UpdateNumberOfLeadsResponse)
+async def update_number_of_leads(number_of_leads:UpdateNumberOfLeads,rule_code:int=Path(...,description="Rule code for an active campaign rule"),session:AsyncSession=Depends(get_async_session),user=Depends(get_current_active_user)):
+    try:
+        leads_update=await update_number_of_leads_db(session,rule_code,number_of_leads.number_of_leads,user)
+        if leads_update==None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=f"Campaign rule does not exist")
+        return UpdateNumberOfLeadsResponse(numer_of_leads=leads_update)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail="An internal server error occurred")
+
+
+@campaign_rule_router.put("/als/change_rule",status_code=status.HTTP_200_OK,response_model=ChangeRuleResponse)
+
+async def change_rule(rule_code: int,camp_code: str,session: AsyncSession = Depends(get_async_session),user=Depends(get_current_active_user)):
+    print(f"the rule code is:{rule_code} and the rule_name:{camp_code}")
+    try: 
+       campaign_code=await fetch_campaign_code_from_campaign_tbl_db(camp_code,session)
+       print("print campaign code inside the route")
+       print(campaign_code)
+       if campaign_code==None:
+           raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f'{camp_code} does not exist, create campaign before setting rule for it')
+       rule_code_query=await fetch_rule_code_from_rules_tbl_and_campaign_rules_tbl_db(camp_code,session)
+       print("print inside the route")
+       if rule_code_query!=None:
+           await update_campaign_rule_and_insert_rule_code_db(rule_code,camp_code,session)
+           message=f"rule number {rule_code_query} was found active, deactivated and {rule_code} is now active for campaign:{camp_code}"
+           return ChangeRuleResponse(success=True,message=message)
+       
+       await insert_new_campaign_rule_on_campaign_rule_tbl_db(camp_code,rule_code,session)
+
+       not_active_messge= f'NO ACTIVE RULE was found active for campaign {camp_code} but rule {rule_code} was made active for it'
+
+       return ChangeRuleResponse(success=True,message=not_active_messge)
+    
+    except HTTPException:
+        raise
+
+    except Exception:
+        await session.rollback()
+        campaign_rules_logger.exception(f"an exception occurred while changing the campaigning rules")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"An internal server error occurred while changing the campaign rule")
+    
+
+@campaign_rule_router.delete("/delete/{rule_code}",status_code=status.HTTP_202_ACCEPTED,description="Delete the campaign rule completely from the system",response_model=DeleteCampaignRuleResponse)
+async def delete_campaign_rule(rule_code:int,session:AsyncSession=Depends(get_async_session),user=Depends(get_current_active_user)):
+    return await remove_campaign_rule_db(rule_code,session,user)
 

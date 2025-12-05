@@ -31,13 +31,11 @@ def _extract_numbers(iterable):
             yield val
 
 
-
 @dnc_router.post("/add-blacklist",description="Add a list of numbers to blacklist locally",response_model=DNCNumberResponse)
 
 async def add_to_dnc(bg_tasks:BackgroundTasks,camp_code:str=Query(...,description="Campaign Code"),file:UploadFile=File(...,description="Add File With numbers to blacklist"),user=Depends(get_current_user)):
     
     try:
-
         filename=(file.filename or "").strip().lower()
         if not filename:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="Empty file names are not allowed")
@@ -50,18 +48,15 @@ async def add_to_dnc(bg_tasks:BackgroundTasks,camp_code:str=Query(...,descriptio
         if file_size<=SMALL_FILE_THRESHOLD:
 
             if filename.endswith(".txt"):
-
                 text=contents.decode("utf-8")
                 dnc_list=[num for num in _extract_numbers(text.splitlines())]
+            
             elif filename.endswith(".csv"):
-
                 df=pd.read_csv(io.StringIO(contents.decode("utf-8")),header=None,dtype=str)
                 dnc_list=list(_extract_numbers(df.iloc[:,0]))
 
             elif filename.endswith((".xls",".xlsx")):
-
                 excel_file=pd.ExcelFile(io.BytesIO(contents))
-
                 for sheet in excel_file.sheet_names:
                     df=pd.read_excel(excel_file,sheet_name=sheet,header=None,dtype=str)
                     dnc_list.extend(_extract_numbers(df.iloc[:,0]))

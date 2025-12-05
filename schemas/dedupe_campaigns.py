@@ -19,8 +19,8 @@ class DeleteCamapignSchema(BaseModel):
     message:str
 
 class SubmitDedupeReturnSchema(BaseModel):
-    campaign_name:str
-    campaign_code:str
+    camp_name:str
+    camp_code:str
     code:str
 
 class ManualDedupeListReturn(BaseModel):

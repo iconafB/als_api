@@ -1,5 +1,5 @@
 from fastapi import HTTPException,status
-from typing import Optional,Any,Literal
+from typing import Optional,Any,Literal,Union
 from pydantic import BaseModel,model_validator,Field as PydField
 from enum import Enum
 
@@ -79,6 +79,7 @@ class RecordsLoadedCondition(BaseModel):
 #checked
 
 class TypeDataCondition(BaseModel):
+
     operator: Literal["equal","not_equal"]
     value: Literal["Status","Enriched","None"]
     @model_validator(mode="before")
@@ -105,7 +106,7 @@ class TypeDataCondition(BaseModel):
 #checked
 class GenderCondition(BaseModel):
     operator: Literal["equal","not_equal"]
-    value: Literal["MALE","FEMALE","NULL"]
+    value: Literal["MALE","FEMALE","BOTH"]
     @model_validator(mode="before")
     def validate_gender(cls,values):
         #Allowed keys
@@ -121,11 +122,10 @@ class GenderCondition(BaseModel):
          # Validate that value is one of allowed literals
 
         value = values.get("value")
-
-        if value not in {"MALE", "FEMALE", "NULL"}:
+        if value not in {"MALE", "FEMALE", "BOTH"}:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Invalid value '{value}' for gender condition. Must be one of 'MALE', 'FEMALE', 'NULL'."
+                detail=f"Invalid value '{value}' for gender condition. Must be one of 'MALE', 'FEMALE', 'BOTH'."
             )
 
         return values
@@ -164,6 +164,7 @@ class AgeCondition(BaseModel):
                 raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,detail="'value' must not be provided for 'between'")
             
         elif op in ["less_than", "less_than_equal"]:
+
             if upper is None:
                 raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,detail=f"Age Condition '{op}' requires 'upper'")
         elif op in ["greater_than", "greater_than_equal"]:
@@ -179,19 +180,19 @@ class AgeCondition(BaseModel):
 
 
 class RuleSchema(BaseModel):
-    pinged_data:bool
     salary:NumericCondition
-    gender:GenderCondition
-    typedata:TypeDataCondition
+    gender:Optional[GenderCondition]=None
+    typedata:Optional[TypeDataCondition]=None
     is_active:IsActiveCondition
-    age:AgeCondition
+    age:Optional[AgeCondition]=None
     derived_income:Optional[NumericCondition]=None
-    is_deduped:bool
+    is_deduped:Optional[bool]=False
     last_used:Optional[LastUsedCondition]=None
     number_of_records:RecordsLoadedCondition
 
     
 #Flattend Numeric Response Condition
+
 class NumericConditionResponse(BaseModel):
     operator: str
     value: Optional[float] = None
@@ -208,6 +209,7 @@ class NumericConditionResponse(BaseModel):
 
 
 # Flattened Age response
+
 class AgeConditionResponse(BaseModel):
     operator: str
     value: Optional[int] = None
@@ -231,10 +233,10 @@ class RecordsLoadedConditionResponse(LastUsedConditionResponse):
     pass
 
 # Top-level response model
+
 class RuleResponseModel(BaseModel):
-    status: str
-    id: int
-    name: str
+    rule_code: int
+    rule_name: str
     salary: NumericConditionResponse
     derived_income: Optional[NumericConditionResponse]=None
     gender: str
@@ -243,7 +245,118 @@ class RuleResponseModel(BaseModel):
     age: AgeConditionResponse
     last_used: Optional[LastUsedConditionResponse] = None
     records_loaded:Optional[RecordsLoadedConditionResponse]=None
+    is_active:bool
 
+class DeactivateRuleResponseModel(BaseModel):
+    rule_code:int
+    rule_name:str
+    message:str
+    class Config:
+        from_attributes = True
+
+class ActivateRuleResponseModel(BaseModel):
+    rule_code:int
+    rule_name:str
+    message:str
+    class Config:
+        from_attributes = True
+
+class UpdatingSalarySchema(BaseModel):
+    salary:Optional[int]=None
+    lower_limit_salary:Optional[int]=None
+    upper_limit_salary:Optional[int]=None
+
+
+class UpdatingDerivedIncomeSchema(BaseModel):
+    derived_income_value:Optional[int]=None
+    lower_limit_derived_income:Optional[int]=None
+    upper_limit_derived_income:Optional[int]=None
+
+class UpdateAgeSchema(BaseModel):
+    age_value:Optional[int]=None
+    age_lower_limit:Optional[int]=None
+    age_upper_limit:Optional[int]=None
+
+class ActivateCampaignRuleResponse(BaseModel):
+    rule_code:int
+    rule_name:str
+    status:str
+    is_active:bool
+    class Config:
+        from_attributes = True
+
+
+class DeleteCampaignRuleResponse(BaseModel):
+    message:str
+    success:bool
+    class Config:
+        from_attributes=True
+
+
+class GetCampaignRuleByNameResponse(BaseModel):
+    status:str
+    created_by:int
+    pinged_data:bool
+    rule_code:int
+    rule_name:str
+    is_active:bool
+
+
+class OperatorBase(BaseModel):
+    operator:str
+    value:Optional[int]=None
+
+class BetweenOperator(OperatorBase):
+    operator:Literal["between"]
+    lower:int
+    upper:int
+
+class SingleValueOperator(OperatorBase):
+    operator:Literal["equal","less_than","greater_than","not_equal","greater_than_equal","less_than_equal"]
+
+NumericRule=Union[BetweenOperator,SingleValueOperator]
+
+class GetCampaignRuleResponse(BaseModel):
+    rule_code:int
+    rule_name:str
+    salary:Optional[NumericRule]=None
+    derived_income:Optional[NumericRule]=None
+    age:Optional[NumericRule]=None
+    gender:Optional[str]=None
+    typedata:Optional[str]=None
+    is_active:bool
+    last_used:Optional[int]=None
+    records_loaded:Optional[int]=None
+
+    class Config:
+        from_attributes = True
+
+class GetAllCampaignRulesResponse(BaseModel):
+    total:int
+    page:int
+    page_size:int
+    rules:list[GetCampaignRuleResponse]
+    class Config:
+        from_attributes = True
+
+class UpdateCampaignRule(BaseModel):
+    new_campaign_rule_name:str
+
+class ChangeRuleResponse(BaseModel):
+    success:bool
+    message:str
+
+class UpdatingCampaignRuleResponse(BaseModel):
+    rule_code:int
+    new_rule_name:str
+
+
+class UpdateNumberOfLeads(BaseModel):
+    number_of_leads:int
+class UpdateNumberOfLeadsResponse(BaseModel):
+    numer_of_leads:int
+    class Config:
+        from_attributes = True
 
 
 #Request schema for rule creation

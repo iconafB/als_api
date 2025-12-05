@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 from fastapi import HTTPException,Depends,BackgroundTasks,status
 from sqlalchemy import update,text
 from sqlmodel import Session,select
 import requests
 import json
+import httpx
 from settings.Settings import get_settings
 #I don't remember why is this here
 import urllib3
@@ -21,6 +24,7 @@ dma_logger=define_logger("dmasa ","logs/dma.log")
 
 #For all the methods use try catch nigga, shitty code
 class DMA_Class():
+
     def __init__(self):
         self.dmasa_api_key=get_settings().dmasa_api_key
         self.dmasa_member_id=get_settings().dmasa_member_id
@@ -29,6 +33,10 @@ class DMA_Class():
         self.submit_dedupes_dmasa_url=get_settings().upload_dmasa_url
         self.read_dmasa_dedupe_status=get_settings().read_dmasa_dedupe_status
         self.read_dedupe_output_url=get_settings().read_dmasa_output_url
+
+        # Shared async client (reused across calls)
+       
+
 
     #ping the dmasa api to check if it's everytime before calling any of these methods
     #This run every morning and provide updates on the platform and send an email to somewhere when the credits run out
@@ -384,6 +392,7 @@ class DMA_Class():
            #await send_email()
            return True
         return
+
 
 def get_dmasa_service():
     return DMA_Class()

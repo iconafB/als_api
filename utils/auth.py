@@ -66,13 +66,9 @@ async def get_current_user(token:Annotated[str,Depends(oauth_scheme)]):
     return user_id
 
 async def get_current_active_user(current_user:Annotated[int,Depends(get_current_user)],session:AsyncSession=Depends(get_async_session)):
-    
-    credential_exception=HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail=f"Could not validate credentials",headers={"WWW-Authenticate": "Bearer"})
-    
+    credential_exception=HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail=f"Invalid credentials",headers={"WWW-Authenticate": "Bearer"})
     if current_user==None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="Inactive user")
-    #get the current user
-    print(f"print the user id:{current_user}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail="Invalid Credentials")
     user_query=select(users_table).where(users_table.id==current_user)
     #exceute the query and get user data
     result_user=await session.exec(user_query)
@@ -81,4 +77,5 @@ async def get_current_active_user(current_user:Annotated[int,Depends(get_current
     if user==None:
         raise credential_exception
     return user
+
 

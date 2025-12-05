@@ -1,10 +1,7 @@
 from fastapi import APIRouter,HTTPException,Depends,UploadFile,File,Query
 from fastapi import status as http_status
-from sqlmodel import Session,select,update,delete,func
-from sqlalchemy import text,and_
-from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.dialects import postgresql
-from typing import Annotated,List,Dict,Any
+from sqlmodel import Session,select
+from typing import Annotated,List
 import openpyxl
 import random
 from io import BytesIO
@@ -13,32 +10,38 @@ import os
 import pandas as pd
 import string
 import time
-from sqlalchemy import insert,and_,or_,literal,exists
-from datetime import datetime, timedelta
+from datetime import datetime
 from sqlmodel.ext.asyncio.session import AsyncSession
 from models.campaigns import Deduped_Campaigns,dedupe_campaigns_tbl
+from models.dedupe_keys_table import manual_dedupe_key_tbl
+
 from models.campaign_dedupe import Campaign_Dedupe
-from models.campaign_rules import dedupe_campaign_rules_tbl
 from database.master_db_connect import get_async_session
 from crud.dedupe_campaign_rules import get_single_dedupe_campaign_rule_by_rule_name
 from crud.dedupe_campaigns import (get_deduped_campaign,get_leads_from_db_for_dedupe_campaign_for_TEBBDY_TERDDY,get_leads_from_db_for_dedupe_campaign_for_TEFWFDY_and_TLEFHQD,get_leads_for_DITFCS_DIFFWT_TELEFFWN,get_leads_for_campaigns_list,get_leads_for_TELEAGNI_TELEBDNI_TELEDDNI_with_derived_income_and_limit,get_leads_for_OMLIFE,get_leads_for_MIWAYHKT,get_leads_for_DIFFWT,get_leads_for_DIAGTE,get_leads_for_AGTEDI,get_leads_for_DITFCS,get_leads_for_CRISPIP3,get_leads_for_TELEFFWN_with_gender_derived_income_and_limit)
-from crud.campaign_rules import (get_rule_by_rule_code_db)
+from crud.campaign_rules import (get_rule_by_rule_code_db,get_campaign_rule_by_rule_name_db)
+from crud.campaigns import get_active_campaign_to_load
 from models.information_table import info_tbl
 from models.campaigns import manual_dedupe_keys
 from crud.dedupe_campaigns import bulk_upsert_update_info_tbl_in_batches,select_code_from_campaign_dedupe_table
 from schemas.dedupe_campaigns import CreateDedupeCampaign,SubmitDedupeReturnSchema,ManualDedupeListReturn,CreateDedupeCampaign,DeleteCamapignSchema,UpdateDedupeCampaign
-from schemas.dedupes import AddDedupeListResponse
+from schemas.dedupes import AddDedupeListResponse,SubmitDedupeReturnResponse,AddManualDedupeResponse
 from database.database import get_session
 from utils.auth import get_current_user,get_current_active_user
 from utils.status_data import get_status_tuple,insert_data_into_finance_table,insert_data_into_location_table,insert_data_into_contact_table,insert_data_into_employment_table,insert_data_into_car_table
 from utils.campaigns import build_dynamic_dedupe_main_query,build_dynamic_query,build_dynamic_query_finance_tbl
 from database.database import engine
 from utils.logger import define_logger
+from utils.add_dedupe_list_helpers import add_dedupe_list_helper
+from utils.dedupes.submit_return_helpers import update_campaign_dedupe_helper,update_campaign_dedupe_status,fetch_delete_update_pending_campaign_ids,calculate_ids_campaign_dedupe_with_status_r
+from utils.dedupes.manual_dedupe_helpers import insert_campaign_dedupe_batch, insert_manual_dedupe_info_tbl
 from database.master_db_connect import get_async_session
+from utils.load_campaign_helpers import load_leads_for_campaign
 from schemas.dedupes import DataInsertionSchema
 from schemas.status_data_routes import InsertStatusDataResponse,InsertEnrichedDataResponse
+from crud.dedupe_campaigns import create_manual_dedupe_key
 
-dedupe_logger=define_logger("als dedupe campaign logs","logs/dedupe_route.log")
+dedupe_logger=define_logger("als_dedupe_campaign_logs","logs/dedupe_route.log")
 
 
 dedupe_routes=APIRouter(tags=["Dedupes"],prefix="/dedupes")
@@ -227,60 +230,97 @@ async def add_dedupes_manually(campaign_name:str=Query(description="Please provi
 
 #add dedupe list for a campaign, campaign code is an arguement and return a filename with leads
 
-@dedupe_routes.post("/add-dedupe-list",status_code=http_status.HTTP_200_OK)
+@dedupe_routes.post("/add-dedupe-list",status_code=http_status.HTTP_200_OK,response_model=AddDedupeListResponse)
 
 async def add_dedupe_list(camp_code:str,session:AsyncSession=Depends(get_async_session),user=Depends(get_current_active_user)):
    
     try:
-        
         #fetch a dedupe campaign that matches the given campaign code
         # campaign=session.exec(select(dedupe_campaigns_tbl).where(Deduped_Campaigns.camp_code==camp_code)).first()
-        campaign=await get_deduped_campaign(camp_code)
+        #this function must return the campaign code for the dedupe campaign, use that code to find the matching rule
+        campaign=await get_active_campaign_to_load(camp_code,session,user)
         #raise an exception if the dedupe campaign does not exist prompting the user to create a rule for that campaign
-        leads=0
-
         if campaign==None:
             dedupe_logger.info(f"dedupe campaign with code:{camp_code} does not exist or it is not a dedupe campaign,requested by user:{user.id} with email:{user.email}")
             raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"Campaign with campaign code:{camp_code} does not exist or it is not a dedupe campaign")
-        
         #search the dedupe campaigns rules tbl using the campaign code
         # dedupe_rule_query=select(dedupe_campaign_rules_tbl).where(dedupe_campaign_rules_tbl.rule_name==camp_code)
-         
         #find the dedupe campaign rule
-
-        campaign_rule=await get_single_dedupe_campaign_rule_by_rule_name(camp_code,session)
-
+        campaign_rule=await get_campaign_rule_by_rule_name_db(camp_code,session,user)
         if campaign_rule==None:
-
             dedupe_logger.info(f'campaign rule with rule name:{camp_code} does not exist')
-            raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"campaign rule with rule name:{rule_name} does not exist")
+            raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"campaign rule with rule name:{campaign_rule} does not exist")
+        #now we have the actual list here,
+        results=await load_leads_for_campaign(campaign_rule.rule_name,session)
+
+        #get leads length
+        leads_length=len(results)
+        if leads_length==0:
+            dedupe_logger.info(f"No leads found for dedupe campaign:{camp_code}")
+            raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST,detail=f"No leads found for the dedupe campaign:{camp_code}")
+        #set the today's list
+        todaysdate=datetime.today().strftime('%Y-%m-%d')
+        filename=camp_code + '-'+ todaysdate
+        #insert leads inside the campaign_dedupe table
+        suffix=''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(4))
+        #create file key
+        key=filename + suffix
+        #prepare list of tuple to insert into the table campaign_dedupe table
+        keys_to_keep=['id','cell']
+        insert_list_to_campaign_dedupe_table=[{k: d[k] for k in keys_to_keep} for d in results]
+        print("print the prepared list")
+        print(insert_list_to_campaign_dedupe_table)
+        #convert the list of dictionaries into a list of tuples
+        dedupe_values={"campaign_code":camp_code,"status":'P',"key":key}
+        list_to_insert_to_campaign_dedupe=[{**d,**dedupe_values} for d in insert_list_to_campaign_dedupe_table]
+        #convert the entries to a list of tuples to insert to the database
+        list_to_insert_to_db=[tuple(d.values()) for d in list_to_insert_to_campaign_dedupe]
+        #insert the add dedupe list into the db
+        insert_result=await add_dedupe_list_helper(session,list_to_insert_to_db,batch_size=1000)
+
+        if '/' in filename:
+            new_string_name=filename.replace("/","-")
+            print("print")
+            print(new_string_name)
+        else:
+            new_string_name=filename
+
+        #convert the list to a dataframe, using list of tuples
+        converted_list=[tuple(d.values()) for d in results]
+        #convert the list of dictionaries to list of tuples
+        df=pd.DataFrame(converted_list)
+        #convert the dataframe to an excel file
+        df.to_excel(new_string_name + '.xlsx',index=False)
+        dedupe_logger.info(f"user:{user.id} with email:{user.email} added a dedupe list")
+
+        return AddDedupeListResponse(FileName=new_string_name + '.txt',TotalRecordsInserted=insert_result["total_inserted"],TotalBatches=insert_result["total_batches"],TotalBatchedTime=insert_result["batch_times"],TotalTime=insert_result["total_time"])
+    
+        #
+        # number_of_leads=None
+        # rule_name=campaign_rule.rule_name
+        # leads_salary=None
+        # leads_gender=None
+
+        # leads_derived_income=None
+
+        # if campaign_rule.gender is not None:
+        #     leads_gender=campaign_rule.gender
         
-        number_of_leads=None
-        rule_name=campaign_rule.rule_name
+        # if campaign_rule.derived_income is not None:
+        #     leads_derived_income=campaign_rule.derived_income
 
-        leads_salary=None
-        leads_gender=None
+        # if campaign_rule.salary is not None:
+        #     leads_salary=campaign_rule.salary
 
-        leads_derived_income=None
-
-        if campaign_rule.gender is not None:
-            leads_gender=campaign_rule.gender
-        
-        if campaign_rule.derived_income is not None:
-            leads_derived_income=campaign_rule.derived_income
-
-        if campaign_rule.salary is not None:
-            leads_salary=campaign_rule.salary
-
-        if campaign_rule.limit is not None:
-            number_of_leads=campaign_rule.limit
+        # if campaign_rule.limit is not None:
+        #     number_of_leads=campaign_rule.limit
             
-        if campaign_rule==None:
-            dedupe_logger(f"no campaign rule has been created for dedupe campaign:{camp_code}")
-            raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"no campaign rule has been created for dedupe campaign:{camp_code}")
+        # if campaign_rule==None:
+        #     dedupe_logger(f"no campaign rule has been created for dedupe campaign:{camp_code}")
+        #     raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"no campaign rule has been created for dedupe campaign:{camp_code}")
         
 
-        campaign_codes=['TEBBDY','TERDDY','TEUAPIDY','TLEBHQD','TLED3HQD','TLEAHQD','TEFWFDY','TLEFHQD']
+        # campaign_codes=['TEBBDY','TERDDY','TEUAPIDY','TLEBHQD','TLED3HQD','TLEAHQD','TEFWFDY','TLEFHQD']
         
         #"TEFWFDY/TLEFHQD": "SELECT i.id, fore_name, last_name, i.cell FROM info_tbl i, campaign_dedupe c WHERE EXISTS (SELECT 1 FROM campaign_dedupe WHERE  c.cell = i.cell) and c.status = \"R\" and c.campaign_name = \"TEFWFDY/TLEFHQD\" and (i.id is not null) order by random() limit 3000"
         #"TEBBDY/TERDDY/TEUAPIDY/TLEBHQD/TLED3HQD/TLEAHQD": "SELECT i.id, fore_name, last_name, i.cell FROM info_tbl i, campaign_dedupe c WHERE EXISTS (SELECT 1 FROM campaign_dedupe WHERE  c.cell = i.cell) and c.status = \"R\" and c.campaign_name = \"TEBBDY/TERDDY/TEUAPIDY/TLEBHQD/TLED3HQD/TLEAHQD\" and (i.id is not null) order by random() limit 3000"
@@ -292,113 +332,113 @@ async def add_dedupe_list(camp_code:str,session:AsyncSession=Depends(get_async_s
 
         #fetch leads for OMLIFE
 
-        if rule_name=='OMLIFE' and leads_derived_income is not None:
 
-            leads=await get_leads_for_OMLIFE(session,leads_derived_income,number_of_leads)
+        # if rule_name=='OMLIFE' and leads_derived_income is not None:
 
-            if leads is None:
+        #     leads=await get_leads_for_OMLIFE(session,leads_derived_income,number_of_leads)
+
+        #     if leads is None:
                 
-                dedupe_logger.info(f"user:{user.id},user email:{user.email} made a request for leads that OMLIFE and no leads were found on the information table")
-                raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST,detail=f"user:{user.id},user email:{user.email} made a request for leads that OMLIFE and no leads were found on the information table")
+        #         dedupe_logger.info(f"user:{user.id},user email:{user.email} made a request for leads that OMLIFE and no leads were found on the information table")
+        #         raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST,detail=f"user:{user.id},user email:{user.email} made a request for leads that OMLIFE and no leads were found on the information table")
         
-        elif rule_name=="MIWAYHKT" and leads_derived_income is not None:
+        # elif rule_name=="MIWAYHKT" and leads_derived_income is not None:
             
-            leads=await get_leads_for_MIWAYHKT(session,leads_derived_income,number_of_leads)
+        #     leads=await get_leads_for_MIWAYHKT(session,leads_derived_income,number_of_leads)
 
-            if leads is None:
-                dedupe_logger.info(f"user:{user.id},user email:{user.email} made a request for leads that matches specifications MIWAYHKT and no leads were found on the information table with a derived income greater or equal to {leads_derived_income}")
-                raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST,detail=f"user:{user.id},user email:{user.email} made a request for leads that matches MIWAYHKT specifications and no leads were found on the information table with a derived income greater or equal to {leads_derived_income}")
+        #     if leads is None:
+        #         dedupe_logger.info(f"user:{user.id},user email:{user.email} made a request for leads that matches specifications MIWAYHKT and no leads were found on the information table with a derived income greater or equal to {leads_derived_income}")
+        #         raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST,detail=f"user:{user.id},user email:{user.email} made a request for leads that matches MIWAYHKT specifications and no leads were found on the information table with a derived income greater or equal to {leads_derived_income}")
         
-        elif rule_name=="DIFFWT" and leads_salary is not None and leads_gender is not None:
+        # elif rule_name=="DIFFWT" and leads_salary is not None and leads_gender is not None:
             
-            leads=await get_leads_for_DIFFWT(session,leads_salary,leads_gender,number_of_leads)
+        #     leads=await get_leads_for_DIFFWT(session,leads_salary,leads_gender,number_of_leads)
             
-            if leads is None:
-                dedupe_logger.info(f"user:{user.id},user email:{user.email} made a request for leads that matches specifications DIFFWT and no leads were found on the information table with a derived income greater or equal to {leads_derived_income}")
-                raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST,detail=f"user:{user.id},user email:{user.email} made a request for leads that matches DIFFWT specifications and no leads were found on the information table with a derived income greater or equal to {leads_derived_income}")
+        #     if leads is None:
+        #         dedupe_logger.info(f"user:{user.id},user email:{user.email} made a request for leads that matches specifications DIFFWT and no leads were found on the information table with a derived income greater or equal to {leads_derived_income}")
+        #         raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST,detail=f"user:{user.id},user email:{user.email} made a request for leads that matches DIFFWT specifications and no leads were found on the information table with a derived income greater or equal to {leads_derived_income}")
 
 
-        elif rule_name=="DIAGTE":
+        # elif rule_name=="DIAGTE":
             
-            leads=await get_leads_for_DIAGTE(session,leads_salary,number_of_leads)
-            if leads is None:
-                dedupe_logger.info(f"user:{user.id},user email:{user.email} made a request for leads that matches specifications DIAGTE and no leads were found on the information table with a derived income greater or equal to {leads_salary}")
+        #     leads=await get_leads_for_DIAGTE(session,leads_salary,number_of_leads)
+        #     if leads is None:
+        #         dedupe_logger.info(f"user:{user.id},user email:{user.email} made a request for leads that matches specifications DIAGTE and no leads were found on the information table with a derived income greater or equal to {leads_salary}")
                 
-                raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST,detail=f"user:{user.id},user email:{user.email} made a request for leads that matches DIAGTE specifications and no leads were found on the information table with a derived income greater or equal to {leads_salary}")
+        #         raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST,detail=f"user:{user.id},user email:{user.email} made a request for leads that matches DIAGTE specifications and no leads were found on the information table with a derived income greater or equal to {leads_salary}")
        
-        elif rule_name in ["AGTEDI","TelAGW","TeleBudg","TeleDial"] and leads_derived_income is None:
+        # elif rule_name in ["AGTEDI","TelAGW","TeleBudg","TeleDial"] and leads_derived_income is None:
             
-            leads=await get_leads_for_AGTEDI(session,leads_salary,leads_length)
-            if leads is None:
-                dedupe_logger.info(f"user:{user.email} made an invalid request leads for campaign:AGTEDI,TelAGW,TeleBudg,or TeleDial")
-                raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"user:{user.email} made an invalid request leads for campaign:AGTEDI,TelAGW,TeleBudg,or TeleDial")
+        #     leads=await get_leads_for_AGTEDI(session,leads_salary,leads_length)
+        #     if leads is None:
+        #         dedupe_logger.info(f"user:{user.email} made an invalid request leads for campaign:AGTEDI,TelAGW,TeleBudg,or TeleDial")
+        #         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"user:{user.email} made an invalid request leads for campaign:AGTEDI,TelAGW,TeleBudg,or TeleDial")
 
-        elif rule_name=="DITFCS":
+        # elif rule_name=="DITFCS":
 
-            leads=await get_leads_for_DITFCS(session,leads_salary,leads_length,leads_gender)
+        #     leads=await get_leads_for_DITFCS(session,leads_salary,leads_length,leads_gender)
 
-            if leads is None:
-                dedupe_logger.info(f"user:{user.email} made an invalid request leads for campaign:DITFCS")
+        #     if leads is None:
+        #         dedupe_logger.info(f"user:{user.email} made an invalid request leads for campaign:DITFCS")
 
-                raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"user:{user.email} made an invalid request leads for campaign:DITFCS")
+        #         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"user:{user.email} made an invalid request leads for campaign:DITFCS")
         
-        elif rule_name=="CRISPIP3":
+        # elif rule_name=="CRISPIP3":
 
-            leads=await get_leads_for_CRISPIP3(session,leads_derived_income)
-            if leads is None:
-                dedupe_logger.info(f"user:{user.email} made an invalid request leads for campaign:CRISPIP3")
-                raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"user:{user.email} made an invalid request leads for campaign:CRISPIP3")
+        #     leads=await get_leads_for_CRISPIP3(session,leads_derived_income)
+        #     if leads is None:
+        #         dedupe_logger.info(f"user:{user.email} made an invalid request leads for campaign:CRISPIP3")
+        #         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"user:{user.email} made an invalid request leads for campaign:CRISPIP3")
             
         
-        elif rule_name in ["DIAGTE","AGTEDI","TelAGW","TeleBudg","TeleDial","TELEAGNI","TELEBDNI","TELEDDNI"]:
+        # elif rule_name in ["DIAGTE","AGTEDI","TelAGW","TeleBudg","TeleDial","TELEAGNI","TELEBDNI","TELEDDNI"]:
 
-            leads=await get_leads_for_campaigns_list(session,leads_salary,number_of_leads)
-            if leads is None:
-                dedupe_logger.info(f"user:{user.email} made an invalid request leads for campaign:CRISPIP3")
-                raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"user:{user.email} made an invalid request leads for campaign:CRISPIP3")
+        #     leads=await get_leads_for_campaigns_list(session,leads_salary,number_of_leads)
+        #     if leads is None:
+        #         dedupe_logger.info(f"user:{user.email} made an invalid request leads for campaign:CRISPIP3")
+        #         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"user:{user.email} made an invalid request leads for campaign:CRISPIP3")
             
 
-        elif rule_name in ["DITFCS","DIFFWT","TELEFFWN"] and leads_gender is not None and leads_salary is not None:
+        # elif rule_name in ["DITFCS","DIFFWT","TELEFFWN"] and leads_gender is not None and leads_salary is not None:
             
-            leads=await get_leads_for_DITFCS_DIFFWT_TELEFFWN(session,leads_salary,leads_gender,leads_length)
-            if leads is None:
-                dedupe_logger.info(f"user:{user.email} made an invalid request leads for campaign:DITFCS, DIFFWT or TELEFFWN")
-                raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"user:{user.email} made an invalid request leads for campaign:DITFCS, DIFFWT, or TELEFFWN")
+        #     leads=await get_leads_for_DITFCS_DIFFWT_TELEFFWN(session,leads_salary,leads_gender,leads_length)
+        #     if leads is None:
+        #         dedupe_logger.info(f"user:{user.email} made an invalid request leads for campaign:DITFCS, DIFFWT or TELEFFWN")
+        #         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"user:{user.email} made an invalid request leads for campaign:DITFCS, DIFFWT, or TELEFFWN")
             
-        elif rule_name in ["TELEAGNI","TELEBDNI","TELEDDNI"] and leads_derived_income is not None:
+        # elif rule_name in ["TELEAGNI","TELEBDNI","TELEDDNI"] and leads_derived_income is not None:
 
-            leads=await get_leads_for_TELEAGNI_TELEBDNI_TELEDDNI_with_derived_income_and_limit(session,leads_derived_income,leads_length)
-            if leads is None:
-                dedupe_logger.info(f"user:{user.email} made an invalid request leads for campaign:DITFCS, DIFFWT or TELEFFWN")
-                raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"user:{user.email} made an invalid request leads for campaign:DITFCS, DIFFWT, or TELEFFWN")
+        #     leads=await get_leads_for_TELEAGNI_TELEBDNI_TELEDDNI_with_derived_income_and_limit(session,leads_derived_income,leads_length)
+        #     if leads is None:
+        #         dedupe_logger.info(f"user:{user.email} made an invalid request leads for campaign:DITFCS, DIFFWT or TELEFFWN")
+        #         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"user:{user.email} made an invalid request leads for campaign:DITFCS, DIFFWT, or TELEFFWN")
         
-        elif rule_name=="TELEFFWN" and leads_derived_income is not None and leads_gender is not None:
-            leads=await get_leads_for_TELEFFWN_with_gender_derived_income_and_limit(session,leads_derived_income,leads_gender,leads_length)
-            if leads is None:
+        # elif rule_name=="TELEFFWN" and leads_derived_income is not None and leads_gender is not None:
+        #     leads=await get_leads_for_TELEFFWN_with_gender_derived_income_and_limit(session,leads_derived_income,leads_gender,leads_length)
+        #     if leads is None:
                 
-                dedupe_logger.info(f"user:{user.email} made an invalid request leads for campaign:DITFCS, DIFFWT or TELEFFWN")
-                raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"user:{user.email} made an invalid request leads for campaign:DITFCS, DIFFWT, or TELEFFWN")
+        #         dedupe_logger.info(f"user:{user.email} made an invalid request leads for campaign:DITFCS, DIFFWT or TELEFFWN")
+        #         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"user:{user.email} made an invalid request leads for campaign:DITFCS, DIFFWT, or TELEFFWN")
         
-        elif rule_name in ["TEFWFDY","TLEFHQD"]:
 
-            leads=await get_leads_from_db_for_dedupe_campaign_for_TEFWFDY_and_TLEFHQD(leads_length)
-            if leads is None:
-                dedupe_logger.info(f"user:{user.email} made an invalid request leads for campaign:DITFCS, DIFFWT or TELEFFWN")
-                raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"user:{user.email} made an invalid request leads for campaign:DITFCS, DIFFWT, or TELEFFWN")
+        # elif rule_name in ["TEFWFDY","TLEFHQD"]:
+
+        #     leads=await get_leads_from_db_for_dedupe_campaign_for_TEFWFDY_and_TLEFHQD(leads_length)
+        #     if leads is None:
+        #         dedupe_logger.info(f"user:{user.email} made an invalid request leads for campaign:DITFCS, DIFFWT or TELEFFWN")
+        #         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"user:{user.email} made an invalid request leads for campaign:DITFCS, DIFFWT, or TELEFFWN")
         
-        #assume this is a new dedupe campaign and it has been created on the dedupe campaign table and it's rule has been created
+        # #assume this is a new dedupe campaign and it has been created on the dedupe campaign table and it's rule has been created
 
-        elif rule_name is not None:
-            campaign=await get_dedupe_campaign(rule_name,session)
-
-            return True
-        
-        else:
-            leads=await get_leads_from_db_for_dedupe_campaign_for_TEBBDY_TERDDY(leads_length)
+        # elif rule_name is not None:
+        #     campaign=await get_dedupe_campaign(rule_name,session)
+        #     return True
+        # else:
+        #     leads=await get_leads_from_db_for_dedupe_campaign_for_TEBBDY_TERDDY(leads_length)
             
-            if leads is None:
-                dedupe_logger.info(f"user:{user.email} made an invalid request leads for campaign:TEBBDY OR TERDDY")
-                raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"user:{user.email} made an invalid request leads for campaign:TEBBDY OR TERDDY")
+        #     if leads is None:
+        #         dedupe_logger.info(f"user:{user.email} made an invalid request leads for campaign:TEBBDY OR TERDDY")
+        #         raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"user:{user.email} made an invalid request leads for campaign:TEBBDY OR TERDDY")
         
 
         # if derived_income is not None:
@@ -423,31 +463,30 @@ async def add_dedupe_list(camp_code:str,session:AsyncSession=Depends(get_async_s
         # we are no longer fetching leads with this code
         #fetched_leads=session.exec(select_query.order_by(func.random()).limit(limit)).fetchall()
         
-        fetched_leads=len(leads)
+        #fetched_leads=len(leads)
 
         #raise an exception if no leads are found
 
-        if fetched_leads<=0:
-            dedupe_logger.info(f"zero leads match campaign:{camp_code} with code:{camp_code}")
-            raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"zero leads that matches this spec")
+        # if fetched_leads<=0:
+        #     dedupe_logger.info(f"zero leads match campaign:{camp_code} with code:{camp_code}")
+        #     raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"zero leads that matches this spec")
         
         #calculate the total leads
-        if fetched_leads>0:
-            todaysdate=datetime.today().strftime('%Y-%m-%d')
+        # if fetched_leads>0:
+        #     todaysdate=datetime.today().strftime('%Y-%m-%d')
 
-            filename=camp_code + '-'+ todaysdate
-            #insert leads inside the campaign_dedupe table
-            suffix=''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(4))
-            #create file key
-            key=filename + suffix
-        
-            #print the key
-            print(f"print the key:{key}")
-            leads_length=len(leads)
+        #     filename=camp_code + '-'+ todaysdate
+        #     #insert leads inside the campaign_dedupe table
+        #     suffix=''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(4))
+        #     #create file key
+        #     key=filename + suffix
+        #     #print the key
+        #     print(f"print the key:{key}")
+        #     leads_length=len(leads)
 
-            #new update data list with data for the campaign dedupes table
+        #     #new update data list with data for the campaign dedupes table
 
-            updated_data=[(data[0],data[1],camp_code,'P',key) for data in leads]
+        #     updated_data=[(data[0],data[1],camp_code,'P',key) for data in leads]
 
             # campaign_object=[
             #     Campaign_Dedupe(id=data[0],cell=data[1],campaign_name=camp_code,status=data[2],code=data[3]) for data in updated_data
@@ -455,11 +494,10 @@ async def add_dedupe_list(camp_code:str,session:AsyncSession=Depends(get_async_s
         
 
            
-            session.exec(text("INSERT INTO Campaign_Dedupe(id,cell,campaign_name,status) VALUES(:id,:cell,:campaign_name,:status)"),[{"id":id,"cell":cell,"campaign_name":campaign_name,"status":status,"code":code} for id,cell,campaign_name,status,code in updated_data])
-            session.commit()
-            session.close()
-            dedupe_logger.info(f"inserted {leads_length}dedupe records into the campaign dedupe table")
-        
+            # await session.exec(text("INSERT INTO Campaign_Dedupe(id,cell,campaign_name,status) VALUES(:id,:cell,:campaign_name,:status)"),[{"id":id,"cell":cell,"campaign_name":campaign_name,"status":status,"code":code} for id,cell,campaign_name,status,code in updated_data])
+            # await session.commit()
+            # dedupe_logger.info(f"inserted {leads_length}dedupe records into the campaign dedupe table")
+       
         #add everything
             #session_campaign_object=session.add_all(campaign_object)
 
@@ -472,15 +510,15 @@ async def add_dedupe_list(camp_code:str,session:AsyncSession=Depends(get_async_s
             # dedupe_logger.info("updated the campaign dedupes table")
             # #update data from the information table
 
-            informatable_data=[(data[1],'DEDUPE') for data in fetched_leads]
+            # informatable_data=[(data[1],'DEDUPE') for data in fetched_leads]
 
-            information_table_length=len(informatable_data)
+            # information_table_length=len(informatable_data)
 
-            session.exec(text("INSERT INTO info_tbl(cell,extra_info) VALUES(:cell,:extra_info)"),[{"cell":cell,"extra_info":extra_info} for cell,extra_info in informatable_data])
-            session.commit()
-            session.close()
+            # await session.exec(text("INSERT INTO info_tbl(cell,extra_info) VALUES(:cell,:extra_info)"),[{"cell":cell,"extra_info":extra_info} for cell,extra_info in informatable_data])
+            # await session.commit()
 
-            dedupe_logger.info(f"inserted {information_table_length} records on the information table")
+            # dedupe_logger.info(f"inserted {information_table_length} records on the information table")
+           
             #Insert data into the information table
             #information_object=[info_tbl(cell=data[0],extra_info=data[1]) for data in informatable_data]
         
@@ -491,26 +529,25 @@ async def add_dedupe_list(camp_code:str,session:AsyncSession=Depends(get_async_s
             #dedupe_logger.info(f"inserted {information_table_length} on the information table")
 
         #search the filename and check if the file name has a slash(/) on its name
-        else:
-            dedupe_logger.info(f"Campaign:{camp_code} entered is not a dedupe campaign")
-            raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"Campaign:{camp_code} is not a dedupe campaign")
+        # else:
+        #     dedupe_logger.info(f"Campaign:{camp_code} entered is not a dedupe campaign")
+        #     raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"Campaign:{camp_code} is not a dedupe campaign")
         
-        if '/' in filename:
-            new_filename=filename.replace("/","-")
-        else:
-            new_filename=filename
+        # if '/' in filename:
+        #     new_filename=filename.replace("/","-")
+        # else:
+        #     new_filename=filename
         
         #convert the leads to a dataframe
-        df=pd.DataFrame(fetched_leads)
+        #df=pd.DataFrame(fetched_leads)
         #convert the dataframe to an excel file
-        df.to_excel(new_filename +'.xlsx',index=False)
+        #df.to_excel(new_filename +'.xlsx',index=False)
         #the above line creates a 
-        return AddDedupeListResponse(status=True,file_name=filename,campaign_name=camp_code,key=key)
+        #return AddDedupeListResponse(status=True,file_name=filename,campaign_name=camp_code,key=key)
     
     except Exception as e:
         dedupe_logger.exception(f"Internal server error occurred while adding a dedupe list for campaign {camp_code}:{e}")
-        session.rollback()
-        session.close()
+        await session.rollback()
         raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"Internal server error occured while adding a dedupe list for campaign:{camp_code}")
 
 
@@ -541,485 +578,92 @@ async def create_dedupe_campaign(campaign:CreateDedupeCampaign,session:Session=D
         dedupe_logger.exception(f"error:{e}")
         raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error occurred while creating a dedupe campaign")
 
-#submit dedupe return route
-@dedupe_routes.post("/submit-dedupe-return",status_code=http_status.HTTP_200_OK,description="Submit file returned from dedupe,this route make sure that only approved cell/id numbers are used for the dedupe campaign and all unapproved numbers are released from being flagged")
 
-async def submit_dedupe_return(data:SubmitDedupeReturnSchema,dedupe_file:UploadFile=File(...),session:AsyncSession=Depends(get_async_session),user=Depends(get_current_active_user)):
+#submit dedupe return route
+@dedupe_routes.post("/submit-dedupe-return",status_code=http_status.HTTP_200_OK,description="Submit file returned from dedupe,this route make sure that only approved cell/id numbers are used for the dedupe campaign and all unapproved numbers are released from being flagged",response_model=SubmitDedupeReturnResponse)
+async def submit_dedupe_return(data:SubmitDedupeReturnSchema,dedupe_file:UploadFile=File(...,description="File prepared for manual dedupe"),session:AsyncSession=Depends(get_async_session),user=Depends(get_current_active_user)):
     try:
-        #read the uploaded file baba
+        id_pattern=re.compile(r"^\d{13}$")
         file_contents=await dedupe_file.read()
         if not file_contents:
             dedupe_logger.info(f"user {user.id} with email:{user.email} uploaded an empty file")
             raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST,detail=f"Empty file uploaded")
-        
-        data_frame=pd.DataFrame(file_contents.splitlines())
-        list_contents=data_frame.values.tolist()
-        #dedupe list content
-        dedupe_list=[]
-
-        for list in list_contents:
-            #new tuple
-            new_tuple=str(list[0],'UTF-8')
-
-            if re.match('^\d{13}$',new_tuple):
-                dedupe_list.append(new_tuple)
-
-        #search for dedupe campaign that matches the campaign code
-
-        #dedupe_query=select(Campaign_Dedupe.code).where(Campaign_Dedupe.code==data.code)
-        fetched_code=await select_code_from_campaign_dedupe_table(session,data.campaign_code)
-
-        #exec_dedupe_query=session.exec(dedupe_query).all()
-        #raise an exception if the query fails
-
-        if fetched_code==None:
-            dedupe_logger.info(f"campaign dedupe:{data.campaign_name} with code:{data.code} does not exist")
-            raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"campaign dedupe:{data.campaign_name} with code:{data.code}")
-        
-        #count the number of campaigns returned
-
-        #campaign_count_query=(select(func.count()).select_from(Campaign_Dedupe).where(Campaign_Dedupe.code==data.code))
-        #this value can also be zero,must be zero
-
-        #campaign_count=session.exec(campaign_count_query).scalar_one()
-
-        #search the dedupe campaign
-        # dedupe_campaign_stmt=select(Deduped_Campaigns).where(Deduped_Campaigns.camp_code==data.campaign_code)
-        
-        # dedupe_campaign=session.exec(dedupe_campaign_stmt).first()
-        dedupe_campaign=await get_dedupe_campaign(session,data.campaign_code)
-        #fetch the associated campaign rule by rule code/campaign code
-        rule=await get_rule_by_rule_code_db(session,data.campaign_code)
-        
-        if rule.is_dedupe and rule.rule_name==data.campaign_code and rule.is_ping_status_null!=None:
-            
-            query,params=build_dynamic_dedupe_main_query(rule)
-            results=await session.execute(query,params)
-            leads_for_dedupe_campaign=results.fetchall()
-
-        else:
-            query,params=build_dynamic_query_finance_tbl(rule)
-            results=await session.execute(query,params)
-            leads_for_dedupe_campaign=results.fetchall()
-        camp_found=False
-
-        if dedupe_campaign==None:
-            camp_found=False
-            dedupe_logger.info(f"campaign:{data.campaign_name} with campaign code:{data.campaign_code} does not exist or is not a dedupe campaign")
-            raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"dedupe campaign:{data.campaign_name} with campaign code:{data.campaign_code} does not exist")
-        
-        else:
-            camp_found=True
-        
-        #test validation
-
-        valid=False
-        validation_message=None
-
-        dedupe_message=None
-        if camp_found == True and len(dedupe_list)>0:
-            valid=True
-            validation_message="Validation Passed"
-            dedupe_message="Dedupe Campaign Exist"
-
-        else:
-            validation_message="Validation Failed"
-            if not camp_found:
-                dedupe_message="Campaign Entered is not a deduped campaign"
-
-            if len(dedupe_list)==0:
-                list_message="Empty list entered"
-        
-        #dedupe list tuple
-        database_list=tuple(dedupe_list)
-
-        #update statement query, questinable
-        update_statement=(update(Campaign_Dedupe).values(status='R').where(Campaign_Dedupe.code==data.code,Campaign_Dedupe.id.in_(database_list)))
-        #execute the query
-        await session.exec(update_statement)
-        #commit the session
-        await session.commit()
-
-        id_query_from_campaign_dedupe=select(Campaign_Dedupe.id).where(Campaign_Dedupe.code==data.code and Campaign_Dedupe.status=='P')
-        
-        id_campaign_dedupe_query_exec=session.exec(id_query_from_campaign_dedupe).all()
-
-        fetch_ids_query=text(f"""SELECT id FROM campaign_dedupe WHERE status='P' AND code =:code""")
-        
-        results_id_numbers=await session.execute(fetch_ids_query,{"code":data.code})
-        
-        rows=results_id_numbers.fetchall()
-
-        id_numbers=[row[0] for row in rows if row[0] is not None]
-
-        db_list=tuple(id_numbers)
-
-        if len(id_numbers)>0:
-            #build placeholders for the db_list values
-            placeholders=",".join([f":id_{i}" for i in range(len(db_list))])
-
-            delete_stmt=text(f"DELETE FROM campaign_dedupe WHERE id IN ({placeholders})")
-
-            #dynamically bind parameters 
-            params={f"id_{i}":id_ for i,id_ in enumerate(db_list)}
-            result=await session.execute(delete_stmt,params)
-            await session.commit()
-            #umbhedo lo
-            numbers_deleted=len(result)
-
-            update_stmt=text(f"UPDATE info_tbl SET extra_info = NULL WHERE id IN ({placeholders})")
-            
-            updating_result=await session.execute(update_stmt,params)
-
-            await session.commit()
-
-            numbers_updated=len(result)
-
-            delete_query_where_status_Is_U=text("DELETE FROM campaign_dedupe WHERE code=:code")
-
-            result=await session.execute(delete_query_where_status_Is_U,{"code":'U'})
-
-            await session.commit()
-
-
-
-        #count the number of ids fetched
-
-        if not id_campaign_dedupe_query_exec:
-            dedupe_logger.info("ids not found")
-            raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"ids not found")
-        #load ids into a list
-
-        id_numbers=[n[0] for n in id_campaign_dedupe_query_exec if n[0] is not None]
-        #place the database list in a tuple
-        id_database_list=tuple(id_numbers)
-        id_database_list_count=session.exec(id_query_from_campaign_dedupe).scalar_one()
-        #if the count is greater than zero
-
-        if id_database_list_count > 0:
-            #delete statement,questionable in_ operator
-            delete_statement=delete(Campaign_Dedupe).where(Campaign_Dedupe.id.in_(id_database_list))
-            #update sql statement
-            update_statement=update(info_tbl).where(info_tbl.id.in_(id_database_list)).values(extra_info=None)
-            #delete session
-            session.exec(delete_statement)
-            session.commit()
-            #update session on the information table
-            session.exec(update_statement)
-            session.commit()
-
-
-        #delete statement on campaign dedupes where code = 'U'
-
-        delete_statement_code_u=delete(Campaign_Dedupe).where(Campaign_Dedupe.code=='U')
-
-        session.exec(delete_statement_code_u)
-        session.commit()
-        #poll the rows affected an raise an exception 
-        
-        return {
-            "Success":True
-        }
+        text=file_contents.decode("utf-8",errors="strict")
+        #look for the campaign
+        # extract value 13-digits IDs\
+        result_count=await calculate_ids_campaign_dedupe_with_status_r(session,data.code)
+        if result_count==0:
+            dedupe_logger.info(f"No results associated with the dedupe key:{data.code}")
+            raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST,detail=f"No results associated with the dedupe key:{data.code}")
+        list_contents=[line for line in text.splitlines() if id_pattern.match(line)]
+        db_list=tuple(list_contents)
+        #update the campaign_dedupe 
+        updated_count=await update_campaign_dedupe_status(db_list,data.code,session,user)
+        results=await fetch_delete_update_pending_campaign_ids(data.code,session,user)
+        return SubmitDedupeReturnResponse(success=True,updated_ids_with_return_status=updated_count,retrieved_pending_ids_from_campaign_dedupe_table=results['retrieved_pending_ids_from_campaign_dedupe_table'],deleted_pending_ids_from_campaign_dedupe_table=results["deleted_ids_from_campaign_dedupe_table"],updated_ids_from_info_tbl=results["updated_ids_from_info_tbl"],deleted_pending_ids_with_status_code_u=results["deleted_stmt_from_campaign_dedupe"])
     
     except Exception as e:
-        dedupe_logger.critical(f"{e}")
-        raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error:{e}")
-    
-#insert status data
-
-# @dedupe_routes.post("/insert_status_data",status_code=http_status.HTTP_200_OK,response_model=InsertStatusDataResponse)
-# #return the time taken for the queries, number of leads affected
-
-# async def insert_status_data(filename:str=Query(...,description="Provided the name of the filename with status data"),session:Session=Depends(get_session)):
-    
-    
-#     try:
-#         delta_time_1=time.time()
-
-#         status_data=[]
-#         #read a csv file that already exist on the server using the query parameter filename
-#         #check if the file exists
-#         if not os.path.exists(filename):
-#             raise HTTPException(status_code=http_status.HTTP_404_NOT_FOUND,detail=f"filename:{filename} does not exist on this system")
-        
-#         #read the csv file into the pandas dataframe
-#         status_dataframe=pd.read_csv(filename)
-#         # convert the csv data into a list
-#         csv_list=status_dataframe.values.tolist()
-#         #append the uploaded list into the status data array
-#         status_data=status_data + csv_list
-#         #read the total number of leads
-#         leads_total=len(status_data)
-#         #seconds passed
-#         delta_time2=time.time()
-#         #total time difference
-#         total_time=delta_time2 - delta_time_1
-#         #rows list 
-#         rows=[]
-#         status_data=['0'+ str(row[15]) for row in status_data]
-
-#         for row in status_data:
-            
-#             cell='0'+str(row[15])
-
-#             if re.match('^(\d{10})?$', str(cell)):
-
-#                 if row[1] is not None:
-#                     date_created_old=row[1].split('')[0]
-#                 #test the id number if its has 13 characters
-#                 idnum=str(row[3])
-#                 salary=str(row[2])
-#                 name = row[6]
-#                 surname = row[7]
-#                 address1 = row[9]
-#                 address2 = row[10]
-#                 suburb = row[11]
-#                 city = row[12]
-#                 postal = row[13]
-#                 email = row[16]
-#                 status = row[17]
-#                 dob = idnum
-#                 gender = idnum
-#                 date_created=date_created_old
-
-#                 result=StatusData(
-#                     idnum=idnum,
-#                     cell=cell,
-#                     date_created=date_created,
-#                     salary=salary,
-#                     name=name,
-#                     surname=surname,
-#                     address1=address1,
-#                     address2=address2,
-#                     suburb=suburb,
-#                     city=city,
-#                     postal=postal,
-#                     email=email,
-#                     status=status,
-#                     dob=dob,
-#                     gender=gender
-#                 )
-
-#                 #append the dictionary
-#                 rows.append(result.model_dump())
-             
-#             #test the rows list if it has the right information
-            
-#             #run queries by making updates on the information table,location table,contact table,employment table,car_table,finance table
-        
-#         for i in range(5):
-
-#             if i==1:
-#                 insert_list=get_status_tuple(rows,i)
-#                 if insert_list==False:
-#                     raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error occurred")
-                   
-                
-#                 response=insert_data_into_finance_table(insert_list)
-#                 if response==False:
-#                     raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"an error occurred while updating the finance table")
-
-#             elif i==2:
-#                 insert_list=get_status_tuple(rows,i)
-#                 if insert_list==False:
-#                     raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error occurred")
-
-#                 response=insert_data_into_location_table(insert_list)
-#                 if response==False:
-#                     raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error occurred")
-
-#             elif i==3:
-#                 insert_list=get_status_tuple(rows,i)
-#                 if insert_list==False:
-                    
-#                     raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error occurred")
-
-#                 response=insert_data_into_contact_table(insert_list)
-#                 if response==False:
-#                     raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error occurred")
-
-#             elif i==4:
-#                 insert_list=get_status_tuple(rows,i)
-
-#                 if insert_list==False:
-#                     raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error occurred")
-
-#                 response=insert_data_into_employment_table(insert_list)
-#                 if response==False:
-#                     raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error occurred")
-
-#             elif i==5:
-#                 insert_list=get_status_tuple(rows,i)
-#                 if insert_list==False:
-#                     raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error occurred")
-
-#                 response=insert_data_into_car_table(insert_list)
-#                 if response==False:
-#                     raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error occurred")
-
-#             else:
-#                 insert_list=get_status_tuple(rows,i)
-#                 if insert_list==False:
-#                     raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error occurred")
-
-#                 response=insert_data_into_finance_table(insert_list)
-#                 if response==False:
-#                     raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"internal server error occurred")
-
-#         status_data_logger.info(f"{len(rows)} updated on finance, car , location, employment, and finance table(e)")
-#         return InsertStatusDataResponse(number_of_leads=leads_total,status=True,time_taken=total_time,information_table=f"{len(rows)} rows updated",contact_table=f"{len(rows)} rows updated",location_table=f"{len(rows)} updated",car_table=f"{len(rows)} rows updated",finance_table=f"{len(rows)} rows updated")
-    
-#     except Exception as e:
-#         status_data_logger.error(f"{str(e)}")
-
-#         raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"{str(e)}")
+        dedupe_logger.exception(f"an internal server error occurred while submitting dedupe by:{user.id} with email:{user.email} {e}")
+        raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"An internal server error occurred while submitting dedupe with dedupe key:{data.code}")
     
 
-@dedupe_routes.post("/add_manual_dedupe_list2",status_code=http_status.HTTP_201_CREATED)
-
-async def add_manual_dedupe_list2(filename:Annotated[UploadFile,File()],camp_code:str=Query(description="Vicidial Campaign Code"),session:AsyncSession=Depends(get_async_session)):
-    #read the file safely
-    file_content=await filename.read()
-    if not file_content:
-        raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST,detail=f"Empty file uploaded")
-    #guide against reading the wrong file
+@dedupe_routes.post("/add_manual_dedupe_list2",status_code=http_status.HTTP_201_CREATED,response_model=AddManualDedupeResponse)
+async def add_manual_dedupe_list2(filename:Annotated[UploadFile,File(description="Upload excel file with cell numbers")],camp_code:str=Query(description="Campaign Code"),user=Depends(get_current_active_user),session:AsyncSession=Depends(get_async_session)): 
     try:
-        wb=openpyxl.load_workbook(BytesIO(file_content),read_only=True)
+        #read the file safely
+        file_content=await filename.read()
+        if not file_content:
+            raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST,detail=f"Empty file uploaded")
+        #validate the id number and cell number
+        za_id_pattern=re.compile(r"^\d{13}$")
+        za_cell_pattern=re.compile(r"^0[678]\d{8}$")
+        try:
+            wb=openpyxl.load_workbook(BytesIO(file_content),read_only=True)
+        except Exception as e:
+            dedupe_logger.exception(f"Error occurred while reading from the workbook",e)
+            raise HTTPException(status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,detail=f"the file uploaded is not a valid or readable Excel workbook (.xlsx)") 
+        
+        rows=[]
+
+        try:
+            for sheet in wb.worksheets:
+                #skip header row
+                for id_num,cell_num in sheet.iter_rows(min_row=2,max_col=2,values_only=True):
+                    if id_num is None or cell_num is None:
+                        continue
+                    id_num_str=str(id_num).strip()
+                    cell_str=str(cell_num).strip()
+                    if not za_id_pattern.match(id_num_str):
+                        continue
+                    if not za_cell_pattern.match(cell_str):
+                        continue
+                    #line=[id_num_str,cell_num]
+                    rows.append((id_num_str,cell_str))
+
+        finally:
+            wb.close()
+
+        if not rows:
+            dedupe_logger.info(f"An error occurred while loading data into the rows list")
+            raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST,detail=f"No data could be extracted")
+        suffix=''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(4))
+        key=filename.filename + suffix
+        #data to insert in the campaign_dedupe table
+        data=[(r[0],r[1],camp_code,'P',key) for r in rows]
+        #call the insert method
+        inserted_rows_campaign_dedupe_table=await insert_campaign_dedupe_batch(session,data,user)
+        #insert into the info_tbl
+        info_tbl_data=[(r[1],'DEDUPE') for r in rows]
+        inserted_rows_on_info_tbl=await  insert_manual_dedupe_info_tbl(session,info_tbl_data,user)
+        #store the dedupe key somewhere
+        dedupe_key=await create_manual_dedupe_key(session,rule_name=camp_code,dedupe_key=key,number_of_leads=len(data),user=user)
+
+        return AddManualDedupeResponse(success=True,campaign_dedupe_records=inserted_rows_campaign_dedupe_table,info_table_records=inserted_rows_on_info_tbl,key=dedupe_key.dedupe_key)
     
+    except HTTPException:
+        raise
+
     except Exception as e:
-        dedupe_logger.exception(f"Error occurred while reading from the workbook: %s",e)
-        raise HTTPException(status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,detail=f"the file uploaded is not a valid or readable Excel workbook (.xlsx)")
-        
-    rows=[]
-
-    for sheet in wb.worksheets:
-        #skip header row
-        for row_tuple in sheet.iter_rows(min_row=2,max_col=2,values_only=True):
-            if len(row_tuple)<2:
-                continue
-            id_num,cell_num=row_tuple[0],row_tuple[1]
-            id_num_str=str(id_num) if id_num is not None else None
-            cell_num_str=str(cell_num) if cell_num is not None else None
-            #this is stupid
-            if not id_num_str or not cell_num_str:
-                continue
-            #line=[id_num_str,cell_num]
-            rows.append((id_num_str,cell_num_str))
-
-    if not rows:
-        dedupe_logger.info(f"An error occurred while loading data into the rows list")
-        raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST,detail=f"No data could be extracted")
-        
-    suffix=''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(4))
-
-    key=filename.filename + suffix
-    #data to insert in the campaign_dedupe table
-
-    campaign_data=[{"id":r[0],"cell":r[1],"campaign_name":camp_code,"status":"P","code":key} for r in rows]
-    #insert data query
-    insert_campaign_data_query=text("""INSERT INTO campaign_dedupe(id,cell,campaign_name,status,code) VALUES(:id,:cell,:campaign_name,:status,:code) ON CONFLICT (id) DO NOTHING""")
-
-    try:
-        await session.execute(insert_campaign_data_query,campaign_data)
-        await session.commit()
-
-    except Exception as e:
-        dedupe_logger.exception(f"an exception occurred while loading the campaign dedupe table:%s",e)
-        raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"An internal server error occurred while inserting data into the campaign_dedupe table")
-
-    #info_tbl data
-    info_data=[{"cell":r[1],"extra_info":"DEDUPE"} for r in rows]
-    #formulate the query
-    insert_info_data_query=text("""INSERT INTO info_tbl(cell,extra_info) VALUES(:cell,:extra_info) ON CONFLICT(cell) DO UPDATE SET extra_info = EXCLUDED.extra_info WHERE info_tbl.cell = EXCLUDED.cell""")
-    # print("print campaign data row")
-    # print(campaign_data)
-    # print("print information table data")
-    # print(info_data)
-
-    try:
-        await session.execute(insert_info_data_query,info_data)
-        await session.commit()
-    except Exception as e:
-        dedupe_logger.exception(f"an exception occurred while inserting data into the info_tbl:%s",e)
-        raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"an internal server error occurred while inserting data into the info table")
+        dedupe_logger.exception(f"An internal server error while adding manual dedupe:{e}")
+        raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,detail="An internal server error occurred while adding a manual dedupe")
     
-
-    #dedupe_models=[]
-    rows_read=len(rows)
-    # if rows_read == 0:
-    #     dedupe_logger.info("The provided list is empty")
-    #     raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST,detail=f"Empty list provided for campaign:{camp_code}")
-    
-    # data_insert_params=[{"id":row[0],"cell":row[1],"campaign_name":row[2],"status":row[3],"code":row[4]} for row in data]
-
-        #campaigns=[Campaign_Dedupe(id=id,cell=cell,campaign_name=camp_code,status=status,key=key) for id,cell,camp_code,status,key in data]
-
-
-        # try:
-        #     sql_insert_into_campaign_dedupe_tbl=text("INSERT INTO campaign_dedupe(id,cell,campaign_name,status,code) VALUES(:id,:cell,:campaign_name,:status,:code)")
-        #     await session.execute(sql_insert_into_campaign_dedupe_tbl,data_insert_params)
-        #     await session.commit()
-        #     dedupe_logger(f"inserted:{rows_read} into the campaign dedupe table")
-
-
-        # except Exception as e:
-        #     await session.rollback()
-        #     dedupe_logger.exception(f"An exception occurred while:{e}")
-        #     raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"An exception occurred while inserting data in the campaign dedupe table")
-
-        # for item in data:
-        #     model_instance=Campaign_Dedupe(id=item[0],cell_number=item[1],campaign_name=item[2],status=item[3],code=item[4])
-        #     dedupe_models.append(model_instance)
-        
-        # update_data=[(r[1],'DEDUPE') for r in rows]
-
-        # update_data_to_list=[{"cell":cell,"extra_info":extra_info} for cell,extra_info in update_data]
-        
-        # try:
-        #     await bulk_upsert_update_info_tbl_in_batches(session,update_data_to_list,batch_size=1000)
-        #     dedupe_logger.info(f"inserted records of length:{len(update_data)} on the info_tbl(information table)")
-        # except Exception as e:
-        #     dedupe_logger.exception(f"an exception occurred while updating info_tbl with:{len(update_data)} data:{e}")
-        #     raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"an internal server error occurred while inserting data into the info_tbl")
-        
-        
-        # with engine.begin() as conn:
-
-        #     conn.execute(text(query),[{"cell":cell,"extra_info":info} for cell,info in update_data])
-
-        # upsert_data=[{"cell":item[0],"extra_info":item[1]} for item in update_data]
-
-        # insert_statement=insert(info_tbl).values(upsert_data)
-
-        # #potential hazards
-        # upsert_statement=insert_statement.on_conflict_do_update(index_elements=['cell'],set={"extra_info":insert_statement.excluded.extra_info})
-        
-        # try:
-        #     session.add_all(dedupe_models)
-        #     dedupe_logger.info(f"dedupe batches successfully added:{len(dedupe_models)}")
-        #     session.exec(upsert_statement)
-        #     session.commit()
-        #     dedupe_logger.info("Successfully updated number and extra information cell")
-        # except Exception as e:
-        #     dedupe_logger.error(e)
-        #     session.rollback()
-        #     raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,detail=f"error occuured while processing the data")
-        
-        # store this key somewhere on the DB(Database table, list key tracker table would be a good option)
-        
-        # stored_key=manual_dedupe_keys(camp_code=camp_code,key_name=key)
-        # session.add(stored_key)
-        # await session.commit()
-        # await session.close()
-
-    return ManualDedupeListReturn(Success=True,Information_Table=f"{len(rows_read)} records updated on the information table",Campaign_Dedupe_Table=f"{len(rows_read)} inserted on the campaign dedupe table",Key=key)
-    
-    # except HTTPException:
-    #     raise
-
-    # except Exception as e:
-    #     dedupe_logger.exception(f"an exception occurred with error:{e}")
-    #     raise HTTPException(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,detail="An internal server error")
-
-
-#fetch dedupe key from the 
